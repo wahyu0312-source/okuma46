@@ -94,11 +94,11 @@
       </tr>
       <tr>
         <td class="section-label">機種</td>
-        <td><select name="kisyuu"><option>MB-46V</option><option>MB-56V</option><option>MB-66V</option></select></td>
+        <td style="width:50mm;">MB-46V</td>
         <td class="section-label">品番</td>
         <td><input type="text" name="part_no" id="part_no" placeholder="例: H1090-0021-02-5"></td>
         <td class="section-label">図番</td>
-        <td><select name="zuban"><option>2825-20</option><option>2835-20</option></select></td>
+         <td class="section-label">品名</td><td>Y軸SG</td>
       </tr>
       <tr>
         <td class="section-label">品名</td><td>Y軸SG</td>
@@ -117,7 +117,7 @@
       <tr><th colspan="3" style="background:#f8f8f8; text-align:left;">測定項目</th></tr>
       <tr><th>項目</th><th>基準値</th><th>測定値</th></tr>
       <tr>
-        <td>収縮時長さ(a)</td><td>190 mm　以下</td><td>
+        <td>収縮時長さ(a)</td><td>190 mm以下</td><td>
           <div class="td-flex">
             <input type="number" step="any" name="a_length" min="0" max="190" placeholder="0-190 mm" onblur="if(this.value!==''&&(parseFloat(this.value)<0||parseFloat(this.value)>190))this.value='';" />
             <span class="unit-span">mm</span>
