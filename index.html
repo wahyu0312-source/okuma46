@@ -142,20 +142,18 @@
 
     /* ========== PRINT STYLES ========== */
     @media print {
-      @page { size: B5 portrait; margin: 0; }
-      html, body {
-        background: none!important;
-        margin: auto!important;
-        padding: 0!important;
-        height: auto!important;
-      }
-      .b5-preview {
-        width: 98%;
-        height: auto;
-        margin: auto;
-        padding: 0;
-        box-shadow: none;
-      }
+  @page { size: B5 portrait; margin: 10mm; }
+
+  html, body { margin: 0 !important; padding: 0 !important; }
+
+  .b5-preview {
+    width: calc(176mm - 20mm);  /* 176 - 2×10 */
+    height: calc(250mm - 20mm); /* 250 - 2×10 */
+    margin: 0 auto;
+    padding: 0;
+    box-shadow: none;
+  }
+}
       .button, .inputter-row, select.no-print { display: none!important; }
       input {
         border: none;
@@ -439,3 +437,4 @@
   </script>
 </body>
 </html>
+
