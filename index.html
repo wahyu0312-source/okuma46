@@ -34,7 +34,7 @@
 
     .b5-preview {
       background: #fff;
-      width: 176mm; max-width: 98vw;  /* B5 */
+      width: 176mm; max-width: 98vw;  /* B5 width */
       margin: 10mm auto; padding: 8mm;
       box-shadow: 0 0 5mm rgba(0,0,0,.25);
       box-sizing: border-box;
@@ -43,9 +43,14 @@
     h2 { text-align: center; font-size: 7mm; margin-bottom: 8mm; }
 
     table { width: 100%; border-collapse: collapse; margin-bottom: 4mm; }
-    th, td { border: .3mm solid #333; padding: 1.2mm 1mm; text-align: center; background: #fff; }
+    th, td { border: .3mm solid #333; padding: 1.2mm 1mm; text-align: center; background: #fff; vertical-align: middle; }
     th { background: #f0f0f0; }
     .section-label { text-align: left; font-weight: bold; background: #f9f9f9; }
+
+    /* Header table: no wrap supaya rata */
+    .header-table td, .header-table th { white-space: nowrap; word-break: keep-all; }
+    .header-table input { width: 100%; min-width: 0; }
+    .header-table input[type="date"]{ min-width: 0; }
 
     .button { margin: 3mm 1mm 0 0; padding: 2mm 8mm; font-size: 3.5mm; }
 
@@ -103,7 +108,7 @@
 
       .b5-preview {
         width: 100%; margin: 0; padding: 0; box-shadow: none; box-sizing: border-box;
-        transform: scale(0.99);               /* jika masih mepet: 0.98 */
+        transform: scale(0.97);               /* kecilkan dikit supaya selalu 1 halaman */
         transform-origin: top left;
       }
       table { width: 100%; }
@@ -123,10 +128,8 @@
 <body>
   <!-- Floating toolbar -->
   <div class="toolbar">
-    <!-- Print tanpa header/footer via PDF autoPrint -->
-    <button type="button" onclick="printViaPDF()">🖨️ 印刷（推奨）</button>
+    <button type="button" onclick="printViaPDF()">🖨️ 印刷（ヘッダー/フッターなし）</button>
     <button type="button" onclick="saveAsPDF()">📄 PDF保存</button>
-    <!-- fallback: clear -->
     <button type="button" onclick="clearAllFields()">🧹 全クリア</button>
   </div>
 
@@ -135,7 +138,7 @@
       <h2>出荷検査成績書</h2>
 
       <!-- HEADER TABLE -->
-      <table>
+      <table class="header-table">
         <tr>
           <td class="section-label">客先</td>
           <td style="width:20%;">オークマ株式会社</td>
@@ -170,7 +173,7 @@
       </table>
 
       <!-- INPUTTER -->
-      <div class="inputter-row">
+      <div class="inputter-row no-print">
         <label>入力者</label>
         <select name="inputter">
           <option value="">- 選択してください -</option>
@@ -298,7 +301,7 @@
         <input type="text" name="bikou" style="width:70%;" />
       </div>
 
-      <!-- Fallback buttons (disembunyikan di layar) -->
+      <!-- Fallback buttons (hidden on screen) -->
       <button type="button" class="button" onclick="printViaPDF()">印刷</button>
       <button type="button" class="button" onclick="saveAsPDF()">PDF保存</button>
       <button type="button" class="button" id="clearAllBtn">全クリア</button>
@@ -338,7 +341,7 @@
       document.getElementById('inspection-form').reset();
       ['stamp1','stamp2'].forEach(id => document.getElementById(id).src = '');
     }
-    document.getElementById('clearAllBtn').addEventListener('click', clearAllFields);
+    document.getElementById('clearAllBtn')?.addEventListener('click', clearAllFields);
 
     // Validasi angka
     document.querySelectorAll('.td-measure-grid input').forEach(input => {
@@ -368,49 +371,61 @@
       });
     }
 
-    // PDF save (aman untuk dicetak manual)
+    // Mirror select (judge) -> span
+    function wireJudgeMirror(){
+      document.querySelectorAll('select.no-print').forEach(sel => {
+        // jika belum ada print-text setelah select, buatkan
+        if (!sel.nextElementSibling || !sel.nextElementSibling.classList.contains('print-text')) {
+          const span = document.createElement('span');
+          span.className = 'print-text';
+          sel.parentNode.insertBefore(span, sel.nextSibling);
+        }
+        const span = sel.nextElementSibling;
+        const upd = () => span.textContent = sel.value;
+        sel.addEventListener('change', upd); upd();
+      });
+    }
+
+    // Render canvas untuk PDF: paksa print-text tampil & no-print sembunyi
+    async function renderFormCanvas() {
+      const el = document.querySelector('.b5-preview');
+      return html2canvas(el, {
+        scale: 2,
+        backgroundColor: '#FFFFFF',
+        useCORS: true,
+        onclone: (doc) => {
+          doc.querySelectorAll('.no-print').forEach(e => e.style.display = 'none');
+          doc.querySelectorAll('.print-text').forEach(e => e.style.display = 'inline');
+        }
+      });
+    }
+
     async function saveAsPDF() {
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'b5' });
-      const el = document.querySelector('.b5-preview');
+      const canvas = await renderFormCanvas();
+      // Fit 1 halaman B5: inset 7mm -> 162 × 236 mm
+      doc.addImage(canvas.toDataURL('image/png'), 'PNG', 7, 7, 162, 236);
       const makingDate = document.querySelector('input[name="makingdate"]').value;
       const ymd = makingDate ? makingDate.replace(/-/g,'') : (()=>{ const t=new Date(); return t.getFullYear()+String(t.getMonth()+1).padStart(2,'0')+String(t.getDate()).padStart(2,'0'); })();
       const inputter = (document.querySelector('select[name="inputter"]').value || 'no-name').replace(/[\\/:*?"<>|]/g,'');
       const orderNo = (document.querySelector('input[name="order_no"]').value || 'no-order').replace(/[\\/:*?"<>|]/g,'');
       const serialNo = (document.querySelector('input[name="serial_no"]').value || 'no-serial').replace(/[\\/:*?"<>|]/g,'');
-
-      await html2canvas(el, { scale: 2, ignoreElements: e => e.classList?.contains('no-print') })
-        .then(canvas => {
-          doc.addImage(canvas.toDataURL(), 'PNG', 5, 5, 166, 240); // inset 5mm
-          doc.save(`${ymd}_${inputter}_${orderNo}_${serialNo}.pdf`);
-        });
+      doc.save(`${ymd}_${inputter}_${orderNo}_${serialNo}.pdf`);
     }
 
-    // PRINT via PDF (tanpa header/footer, auto open print dialog)
     async function printViaPDF() {
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'b5' });
-      const el = document.querySelector('.b5-preview');
-
-      await html2canvas(el, { scale: 2, ignoreElements: e => e.classList?.contains('no-print') })
-        .then(canvas => {
-          doc.addImage(canvas.toDataURL(), 'PNG', 5, 5, 166, 240); // inset 5mm
-          if (doc.autoPrint) doc.autoPrint();       // sisipkan perintah print ke PDF
-          const blobUrl = doc.output('bloburl');    // buka di viewer browser
-          window.open(blobUrl, '_blank');          // viewer akan tampil; banyak browser langsung munculkan dialog print
-        });
+      const canvas = await renderFormCanvas();
+      doc.addImage(canvas.toDataURL('image/png'), 'PNG', 7, 7, 162, 236);
+      if (doc.autoPrint) doc.autoPrint();
+      const blobUrl = doc.output('bloburl');
+      window.open(blobUrl, '_blank');
     }
 
-    // Init mirrors
     window.addEventListener('load', () => {
-      // Mirror select (judge) -> span
-      document.querySelectorAll('select.no-print').forEach(sel => {
-        const span = document.createElement('span');
-        span.className = 'print-text';
-        sel.parentNode.insertBefore(span, sel.nextSibling);
-        const upd = () => span.textContent = sel.value;
-        sel.addEventListener('change', upd); upd();
-      });
+      wireJudgeMirror();
       wireDateMirror();
     });
   </script>
