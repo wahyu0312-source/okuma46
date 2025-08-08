@@ -17,6 +17,10 @@
       height: 100%;
     }
 
+    /* default: di layar, print-text disembunyikan, no-print ditampilkan */
+    .print-text { display: none; }
+    .no-print   { display: initial; }
+
     /* samakan font input/select termasuk date */
     input, select { font-size: 3.5mm; padding: 0.5mm; box-sizing: border-box; font-family: Arial, sans-serif; }
     input[type="date"]{ font-family: inherit; -webkit-appearance: none; appearance: none; line-height: 1.2; }
@@ -349,7 +353,6 @@
       });
     });
 
-    // mirror select -> span (sudah ada)
     // mirror date -> span (biar font konsisten saat print)
     function wireDateMirror(){
       document.querySelectorAll('input[type="date"]').forEach(inp=>{
@@ -389,7 +392,7 @@
     }
 
     window.addEventListener('load', () => {
-      // mirror select
+      // mirror select -> span (sederhana: tampilkan nilai)
       document.querySelectorAll('select.no-print').forEach(sel => {
         const span = document.createElement('span');
         span.className = 'print-text';
