@@ -17,7 +17,7 @@
     .no-print { display: initial; }
     .print-text { display: none; }
 
-    /* konsistensi font (termasuk date) */
+    /* Konsistensi font (termasuk date) */
     input, select { font-size: 3.5mm; padding: .5mm; box-sizing: border-box; font-family: Arial, sans-serif; }
     input[type="date"] { font-family: inherit; -webkit-appearance: none; appearance: none; line-height: 1.2; }
     input[type="date"]::-webkit-datetime-edit,
@@ -113,7 +113,8 @@
       }
       table { width: 100%; }
 
-      .button, .inputter-row, .no-print { display: none !important; }
+      /* Sembunyikan yg tak perlu cetak, munculkan mirror */
+      .button, .no-print { display: none !important; }
       .print-text { display: inline !important; }
 
       input { border: none; background: none; padding: 0; font-size: 3.5mm; }
@@ -172,7 +173,7 @@
         </tr>
       </table>
 
-      <!-- INPUTTER -->
+      <!-- INPUTTER (Hanya layar) -->
       <div class="inputter-row no-print">
         <label>入力者</label>
         <select name="inputter">
@@ -189,35 +190,35 @@
         <tr>
           <td>本体取付け方法</td><td>組立架台取付合わせ確認</td>
           <td>
-            <select name="judge1" class="no-print"><option>合</option><option>否</option></select>
+            <select name="judge1" class="no-print judge-select"><option>合</option><option>否</option></select>
             <span class="print-text"></span>
           </td>
         </tr>
         <tr>
           <td>摺動テスト</td><td>摺動テスト台走り・機能確認</td>
           <td>
-            <select name="judge2" class="no-print"><option>合</option><option>否</option></select>
+            <select name="judge2" class="no-print judge-select"><option>合</option><option>否</option></select>
             <span class="print-text"></span>
           </td>
         </tr>
         <tr>
           <td>摺動時の異音</td><td>異音の有無確認</td>
           <td>
-            <select name="judge3" class="no-print"><option>無</option><option>有</option></select>
+            <select name="judge3" class="no-print judge-select"><option>無</option><option>有</option></select>
             <span class="print-text"></span>
           </td>
         </tr>
         <tr>
           <td>外観検査</td><td>キズ・バリの有無確認</td>
           <td>
-            <select name="judge4" class="no-print"><option>合</option><option>否</option></select>
+            <select name="judge4" class="no-print judge-select"><option>合</option><option>否</option></select>
             <span class="print-text"></span>
           </td>
         </tr>
         <tr>
           <td>カバーワイパーの除隅</td><td>ワイパー材 t=0.05にて確認</td>
           <td>
-            <select name="judge5" class="no-print"><option>合</option><option>否</option></select>
+            <select name="judge5" class="no-print judge-select"><option>合</option><option>否</option></select>
             <span class="print-text"></span>
           </td>
         </tr>
@@ -291,7 +292,7 @@
       <!-- FINAL JUDGMENT & REMARKS -->
       <div style="margin:2mm 0;">
         <label style="font-weight:bold;">総合判定</label>
-        <select name="final_judgment" class="no-print" style="margin-left:10mm;">
+        <select name="final_judgment" class="no-print judge-select" style="margin-left:10mm;">
           <option>合</option><option>否</option>
         </select>
         <span class="print-text"></span>
@@ -310,21 +311,26 @@
       <div class="company-name">東京精密発條株式会社</div>
       <div class="stamp-box-row">
         <div>
-          <select class="no-print" onchange="updateStampPreview('stamp1',this.value)">
+          <!-- dropdown stempel: TIDAK dimirror -->
+          <select class="no-print stamp-select" onchange="updateStampPreview('stamp1',this.value)">
             <option value="">- 印鑑選択 -</option>
             <option value="nakagawa.png">中川部長</option>
             <option value="hasebe.png">長谷部</option>
             <option value="ishibashi.png">石橋</option>
+            <option value="togo.png">都合</option>
+            <option value="wahyu.png">ワーユ</option>
+            <option value="yusuf.png">ユスフ</option>
           </select>
           <div class="stamp-label">検印</div>
           <div class="signature-box"><img id="stamp1" src="" alt=""></div>
         </div>
         <div>
-          <select class="no-print" onchange="updateStampPreview('stamp2',this.value)">
+          <select class="no-print stamp-select" onchange="updateStampPreview('stamp2',this.value)">
             <option value="">- 印鑑選択 -</option>
+            <option value="nakagawa.png">中川部長</option>
             <option value="hasebe.png">長谷部</option>
-            <option value="togo.png">都合</option>
             <option value="ishibashi.png">石橋</option>
+            <option value="togo.png">都合</option>
             <option value="wahyu.png">ワーユ</option>
             <option value="yusuf.png">ユスフ</option>
           </select>
@@ -371,10 +377,9 @@
       });
     }
 
-    // Mirror select (judge) -> span
+    // Mirror hanya untuk select 判定 (judge)
     function wireJudgeMirror(){
-      document.querySelectorAll('select.no-print').forEach(sel => {
-        // jika belum ada print-text setelah select, buatkan
+      document.querySelectorAll('select.judge-select').forEach(sel => {
         if (!sel.nextElementSibling || !sel.nextElementSibling.classList.contains('print-text')) {
           const span = document.createElement('span');
           span.className = 'print-text';
@@ -386,7 +391,7 @@
       });
     }
 
-    // Render canvas untuk PDF: paksa print-text tampil & no-print sembunyi
+    // Render canvas untuk PDF: tampilkan mirror & sembunyikan elemen no-print
     async function renderFormCanvas() {
       const el = document.querySelector('.b5-preview');
       return html2canvas(el, {
@@ -408,7 +413,7 @@
       doc.addImage(canvas.toDataURL('image/png'), 'PNG', 7, 7, 162, 236);
       const makingDate = document.querySelector('input[name="makingdate"]').value;
       const ymd = makingDate ? makingDate.replace(/-/g,'') : (()=>{ const t=new Date(); return t.getFullYear()+String(t.getMonth()+1).padStart(2,'0')+String(t.getDate()).padStart(2,'0'); })();
-      const inputter = (document.querySelector('select[name="inputter"]').value || 'no-name').replace(/[\\/:*?"<>|]/g,'');
+      const inputter = (document.querySelector('select[name="inputter"]')?.value || 'no-name').replace(/[\\/:*?"<>|]/g,'');
       const orderNo = (document.querySelector('input[name="order_no"]').value || 'no-order').replace(/[\\/:*?"<>|]/g,'');
       const serialNo = (document.querySelector('input[name="serial_no"]').value || 'no-serial').replace(/[\\/:*?"<>|]/g,'');
       doc.save(`${ymd}_${inputter}_${orderNo}_${serialNo}.pdf`);
