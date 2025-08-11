@@ -130,6 +130,15 @@
 
       * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
+
+    /* ======= INVALID HIGHLIGHT (tidak ikut tercetak) ======= */
+    .td-measure-grid input.invalid {
+      background: #ffebee;
+      box-shadow: inset 0 0 0 1px #d32f2f;
+    }
+    @media print {
+      .td-measure-grid input.invalid { background: transparent !important; box-shadow: none !important; }
+    }
   </style>
 </head>
 <body>
@@ -238,7 +247,8 @@
           <td>190 mm以下</td>
           <td class="td-measure">
             <div class="td-measure-grid">
-              <input type="number" name="a_length" placeholder="0-190" min="0" max="190" data-min="0" data-max="190" />
+              <!-- integer: max 3 digit -->
+              <input type="text" inputmode="numeric" name="a_length" placeholder="0-190" data-min="0" data-max="190" />
               <span>mm</span>
             </div>
           </td>
@@ -248,7 +258,8 @@
           <td>670 mm以上</td>
           <td class="td-measure">
             <div class="td-measure-grid">
-              <input type="number" name="b_length" placeholder=">=670" min="670" data-min="670" />
+              <!-- integer: max 3 digit (670+) -->
+              <input type="text" inputmode="numeric" name="b_length" placeholder=">=670" data-min="670" />
               <span>mm</span>
             </div>
           </td>
@@ -258,7 +269,8 @@
           <td>480 mm以上</td>
           <td class="td-measure">
             <div class="td-measure-grid">
-              <input type="number" name="c_length" placeholder=">=480" min="480" data-min="480" />
+              <!-- integer: max 3 digit (480+) -->
+              <input type="text" inputmode="numeric" name="c_length" placeholder=">=480" data-min="480" />
               <span>mm</span>
             </div>
           </td>
@@ -268,7 +280,8 @@
           <td>0 - 4.0 kg</td>
           <td class="td-measure">
             <div class="td-measure-grid">
-              <input type="number" step="0.1" name="start_resist" placeholder="0-4.0" min="0" max="4" data-min="0" data-max="4" />
+              <!-- decimal allowed: 1 place -->
+              <input type="text" inputmode="decimal" step="0.1" name="start_resist" placeholder="0-4.0" data-min="0" data-max="4" />
               <span>kg</span>
             </div>
           </td>
@@ -278,7 +291,7 @@
           <td>0 - 4.0 kg</td>
           <td class="td-measure">
             <div class="td-measure-grid">
-              <input type="number" step="0.1" name="mid_resist" placeholder="0-4.0" min="0" max="4" data-min="0" data-max="4" />
+              <input type="text" inputmode="decimal" step="0.1" name="mid_resist" placeholder="0-4.0" data-min="0" data-max="4" />
               <span>kg</span>
             </div>
           </td>
@@ -288,7 +301,7 @@
           <td>0 - 4.0 kg</td>
           <td class="td-measure">
             <div class="td-measure-grid">
-              <input type="number" step="0.1" name="end_resist" placeholder="0-4.0" min="0" max="4" data-min="0" data-max="4" />
+              <input type="text" inputmode="decimal" step="0.1" name="end_resist" placeholder="0-4.0" data-min="0" data-max="4" />
               <span>kg</span>
             </div>
           </td>
@@ -350,27 +363,92 @@
   <script>
     function updateStampPreview(id, src) { document.getElementById(id).src = src || ''; }
     function clearAllFields() {
-      document.getElementById('inspection-form').reset();
+      const form = document.getElementById('inspection-form');
+      form.reset();
       ['stamp1','stamp2'].forEach(id => document.getElementById(id).src = '');
+      // bersihkan highlight invalid
+      form.querySelectorAll('.td-measure-grid input.invalid').forEach(el => el.classList.remove('invalid'));
+      // refresh mirror select
+      wireJudgeMirror();
+      // refresh mirror date
+      wireDateMirror();
     }
     document.getElementById('clearAllBtn')?.addEventListener('click', clearAllFields);
 
-    // Validasi angka simpel
-    document.querySelectorAll('.td-measure-grid input').forEach(input => {
-      let lastValid = input.value;
-      input.addEventListener('input', () => {
-        const val = parseFloat(input.value);
-        const min = parseFloat(input.dataset.min ?? -Infinity);
-        const max = parseFloat(input.dataset.max ?? Infinity);
-        if (!isNaN(val) && val >= min && val <= max) { lastValid = input.value; input.classList.remove('invalid'); }
+    // ===== Validasi "測定値" =====
+    // - Maks 3 digit sebelum titik.
+    // - Jika step mengandung ".", izinkan 1 digit desimal.
+    // - Cek min/max via data-min / data-max.
+    // - Out-of-range saat blur -> kosongkan & tandai merah.
+    (function wireMeasureValidation() {
+      const fields = document.querySelectorAll('.td-measure-grid input');
+
+      fields.forEach(inp => {
+        const allowDecimal = (inp.getAttribute('step') || '').includes('.');
+        const reInt = /^\d{0,3}$/;
+        const reDec = /^\d{0,3}(\.\d{0,1})?$/;
+
+        const getMin = () => parseFloat(inp.dataset.min ?? '-Infinity');
+        const getMax = () => parseFloat(inp.dataset.max ?? 'Infinity');
+
+        inp.addEventListener('input', () => {
+          let v = inp.value;
+
+          // Hanya angka dan titik
+          v = v.replace(/[^\d.]/g, '');
+
+          // Hapus titik ganda
+          const firstDot = v.indexOf('.');
+          if (firstDot !== -1) {
+            v = v.slice(0, firstDot + 1) + v.slice(firstDot + 1).replace(/\./g, '');
+          }
+
+          // Batasi 3 digit sebelum titik + 1 desimal jika diizinkan
+          if (v.includes('.')) {
+            const [d, f] = v.split('.');
+            const dTrim = d.slice(0, 3);
+            const fTrim = allowDecimal ? (f ?? '').slice(0, 1) : '';
+            v = fTrim ? `${dTrim}.${fTrim}` : dTrim;
+          } else {
+            v = v.slice(0, 3);
+          }
+
+          // Terapkan regex
+          const ok = allowDecimal ? reDec.test(v) : reInt.test(v);
+          if (!ok) {
+            v = (v.match(/^\d{0,3}/)?.[0]) ?? '';
+          }
+
+          inp.value = v;
+          inp.classList.remove('invalid'); // hilangkan merah saat sedang diketik
+        });
+
+        inp.addEventListener('blur', () => {
+          const v = inp.value;
+          if (v === '') { inp.classList.remove('invalid'); return; }
+
+          const n = parseFloat(v);
+          const min = getMin();
+          const max = getMax();
+
+          const inRange =
+            !Number.isNaN(n) &&
+            n >= (Number.isFinite(min) ? min : -Infinity) &&
+            n <= (Number.isFinite(max) ? max : Infinity);
+
+          if (!inRange) {
+            inp.value = '';             // kosongkan
+            inp.classList.add('invalid'); // tandai merah
+          } else {
+            if (allowDecimal) {
+              // Normalisasi tampilan ke 1 desimal
+              inp.value = n.toFixed(1).replace(/\.0$/, '.0');
+            }
+            inp.classList.remove('invalid');
+          }
+        });
       });
-      input.addEventListener('blur', () => {
-        const val = parseFloat(input.value);
-        const min = parseFloat(input.dataset.min ?? -Infinity);
-        const max = parseFloat(input.dataset.max ?? Infinity);
-        if (!isNaN(val) && (val < min || val > max)) input.value = lastValid;
-      });
-    });
+    })();
 
     // Mirror tanggal -> span (agar konsisten saat print)
     function wireDateMirror(){
@@ -425,7 +503,7 @@
       doc.save(`${ymd}_${inputter}_${orderNo}_${serialNo}.pdf`);
     }
 
-    // Print via PDF tanpa header/footer browser
+    // Print via PDF r
     async function printViaPDF() {
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'b5' });
