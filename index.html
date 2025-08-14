@@ -157,7 +157,7 @@
       <table class="header-table">
         <tr>
           <td class="section-label">客先</td>
-          <td style="width:20%;">オークマ株式会社</td>
+          <td style="width:30%;">オークマ株式会社 殿</td>
           <td class="section-label">発行No.</td>
           <td><input type="text" name="customer_no" placeholder="例: TTS60-01-460" /></td>
           <td class="section-label">発行年月日</td>
@@ -449,7 +449,57 @@
         });
       });
     })();
+// ===== Navigasi Enter di SEMUA field (input, select, textarea) =====
+    function wireEnterNavigationAll() {
+      const form = document.getElementById('inspection-form');
 
+      // Ambil semua field fokusable di dalam form, urut DOM
+      const getFields = () => Array.from(
+        form.querySelectorAll('input, select, textarea')
+      ).filter(el =>
+        !el.disabled &&
+        el.type !== 'hidden' &&
+        el.offsetParent !== null // tidak tersembunyi (display:none/visibility)
+      );
+
+      // Helper: pindah fokus sesuai arah (+1 maju, -1 mundur)
+      const moveFocus = (fromEl, dir = +1) => {
+        const list = getFields(); // ambil ulang untuk kondisi dinamis
+        const i = list.indexOf(fromEl);
+        if (i === -1) return;
+        let j = i + dir;
+
+        // Cycling: akhir -> awal, awal -> akhir
+        if (j >= list.length) j = 0;
+        if (j < 0) j = list.length - 1;
+
+        const next = list[j];
+        next?.focus?.();
+
+        // Untuk input teks/angka/date: auto-select agar cepat overwrite
+        if (next && next.tagName === 'INPUT' && next.type !== 'checkbox' && next.type !== 'radio' && next.type !== 'file') {
+          next.select?.();
+        }
+      };
+
+      // Pasang handler sekali per elemen (hindari duplikasi)
+      getFields().forEach(el => {
+        if (el.dataset.enterNavWired === '1') return;
+        el.dataset.enterNavWired = '1';
+
+        el.addEventListener('keydown', (e) => {
+          // Jangan ganggu saat masih composing IME (JP)
+          if (e.isComposing || e.keyCode === 229) return;
+
+          if (e.key === 'Enter') {
+            // Pada textarea, kalau mau multi-line, comment baris ini:
+            e.preventDefault(); // cegah submit / newline
+            const backward = e.shiftKey === true; // Shift+Enter = mundur
+            moveFocus(el, backward ? -1 : +1);
+          }
+        });
+      });
+    }
     // Mirror tanggal -> span (agar konsisten saat print)
     function wireDateMirror(){
       document.querySelectorAll('input[type="date"]').forEach(inp=>{
@@ -536,6 +586,7 @@
   </script>
 </body>
 </html>
+
 
 
 
