@@ -144,12 +144,18 @@
 <body>
   <!-- Floating toolbar -->
   <div class="toolbar">
+    <!-- Tombol Submit (menyasar form di bawah via atribut 'form') -->
+    <button type="submit" form="inspection-form">💾 保存</button>
     <button type="button" onclick="printViaPDF()">🖨️ 印刷</button>
     <button type="button" onclick="saveAsPDF()">📄 PDF保存</button>
     <button type="button" onclick="clearAllFields()">🧹 全てクリア</button>
   </div>
 
-  <form id="inspection-form">
+  <!-- GANTI YOUR_WEB_APP_URL DENGAN URL WEB APP APPS SCRIPT KAMU -->
+  <form id="inspection-form" method="post" action="https://script.google.com/macros/s/AKfycbyf1G_UtBboPiPpPHN1JFCRG6NJ0rAPJC72ITRopnOKWET3rSaLiMru0ggckpNjVsMakw/exec">
+    <!-- identitas form untuk backend -->
+    <input type="hidden" name="form_slug" value="inspection_mb46v">
+
     <div class="b5-preview">
       <h2>出荷検査成績書</h2>
 
@@ -247,7 +253,6 @@
           <td>190 mm以下</td>
           <td class="td-measure">
             <div class="td-measure-grid">
-              <!-- integer: max 3 digit -->
               <input type="text" inputmode="numeric" name="a_length" placeholder="0-190" data-min="0" data-max="190" />
               <span>mm</span>
             </div>
@@ -258,7 +263,6 @@
           <td>670 mm以上</td>
           <td class="td-measure">
             <div class="td-measure-grid">
-              <!-- integer: max 3 digit (670+) -->
               <input type="text" inputmode="numeric" name="b_length" placeholder=">=670" data-min="670" />
               <span>mm</span>
             </div>
@@ -269,7 +273,6 @@
           <td>480 mm以上</td>
           <td class="td-measure">
             <div class="td-measure-grid">
-              <!-- integer: max 3 digit (480+) -->
               <input type="text" inputmode="numeric" name="c_length" placeholder=">=480" data-min="480" />
               <span>mm</span>
             </div>
@@ -280,7 +283,6 @@
           <td>4.0 kg以下</td>
           <td class="td-measure">
             <div class="td-measure-grid">
-              <!-- decimal allowed: 1 place -->
               <input type="text" inputmode="decimal" step="0.1" name="start_resist" placeholder="0-4.0" data-min="0" data-max="4" />
               <span>kg</span>
             </div>
@@ -321,16 +323,10 @@
         <input type="text" name="bikou" style="width:70%;" />
       </div>
 
-      <!-- Fallback buttons (hidden on screen) -->
-      <!--<button type="button" class="button no-print" onclick="printViaPDF()">印刷</button>
-      <button type="button" class="button no-print" onclick="saveAsPDF()">PDF保存</button>
-      <button type="button" class="button no-print" id="clearAllBtn">全クリア</button> -->
-
       <!-- COMPANY & STAMPS -->
       <div class="company-name">東京精密発條株式会社</div>
       <div class="stamp-box-row">
         <div>
-          <!-- dropdown stempel: TIDAK dimirror -->
           <select class="no-print" onchange="updateStampPreview('stamp1',this.value)">
             <option value="">- 印鑑選択 -</option>
             <option value="nakagawa.png">中川部長</option>
@@ -366,11 +362,8 @@
       const form = document.getElementById('inspection-form');
       form.reset();
       ['stamp1','stamp2'].forEach(id => document.getElementById(id).src = '');
-      // bersihkan highlight invalid
       form.querySelectorAll('.td-measure-grid input.invalid').forEach(el => el.classList.remove('invalid'));
-      // refresh mirror select
       wireJudgeMirror();
-      // refresh mirror date
       wireDateMirror();
     }
     document.getElementById('clearAllBtn')?.addEventListener('click', clearAllFields);
@@ -379,45 +372,33 @@
 (function wireMeasureValidation() {
   const fields = document.querySelectorAll('.td-measure-grid input');
 
-  // Normalisasi berbagai "titik" & koma ke '.'
   const normalizeDecimalChars = (s) =>
     s.replace(/[，,]/g, '.').replace(/[．｡。]/g, '.');
 
   fields.forEach(inp => {
     const allowDecimal = (inp.getAttribute('step') || '').includes('.');
-    const MAX_INT_DIGITS = 4;  // konsisten 4 digit
+    const MAX_INT_DIGITS = 4;
 
     inp.addEventListener('input', () => {
-      // 1) Normalisasi karakter desimal dari IME/locale
       let v = normalizeDecimalChars(inp.value);
-
-      // 2) Saring karakter non-digit/non-dot
       v = v.replace(/[^\d.]/g, '');
-
-      // 3) Pastikan hanya ada 1 dot: gabungkan sisa bagian sebagai fraksi mentah
       if ((v.match(/\./g) || []).length > 1) {
         const [head, ...rest] = v.split('.');
         v = head + '.' + rest.join('').replace(/\D/g, '');
       }
-
-      // 4) Pisahkan bagian integer & fraksi
       if (v.includes('.')) {
         let [d = '', f = ''] = v.split('.');
         const dTrim = d.slice(0, MAX_INT_DIGITS);
 
         if (allowDecimal) {
-          // Batasi fraksi 1 digit; biarkan trailing '.' sementara jika belum ada fraksi
           const fTrim = (f ?? '').replace(/\D/g, '').slice(0, 1);
           v = f === '' ? `${dTrim}.` : `${dTrim}.${fTrim}`;
         } else {
-          // Field integer: buang fraksi & titik
           v = dTrim;
         }
       } else {
-        // Tidak ada titik → batasi panjang integer
         v = v.slice(0, MAX_INT_DIGITS);
       }
-
       inp.value = v;
       inp.classList.remove('invalid');
     });
@@ -425,11 +406,8 @@
     inp.addEventListener('blur', () => {
       let v = normalizeDecimalChars(inp.value);
       if (v === '') { inp.classList.remove('invalid'); return; }
-
-      // Jika user tinggalkan trailing dot (mis. "7.") → jadikan "7.0"
       if (allowDecimal && /\.$/.test(v)) v = v.replace(/\.$/, '.0');
 
-      // Hitung & validasi rentang
       const n = parseFloat(v);
       const min = parseFloat(inp.dataset.min ?? '-Infinity');
       const max = parseFloat(inp.dataset.max ?? 'Infinity');
@@ -445,11 +423,9 @@
         return;
       }
 
-      // Format akhir: bulatkan 1 desimal untuk field desimal
       if (allowDecimal) {
         inp.value = n.toFixed(1).replace(/\.0$/, '.0');
       } else {
-        // pastikan integer murni tanpa titik
         inp.value = String(Math.trunc(n)).slice(0, 4);
       }
       inp.classList.remove('invalid');
@@ -461,54 +437,44 @@
     function wireEnterNavigationAll() {
       const form = document.getElementById('inspection-form');
 
-      // Ambil semua field fokusable di dalam form, urut DOM
       const getFields = () => Array.from(
         form.querySelectorAll('input, select, textarea')
       ).filter(el =>
         !el.disabled &&
         el.type !== 'hidden' &&
-        el.offsetParent !== null // tidak tersembunyi (display:none/visibility)
+        el.offsetParent !== null
       );
 
-      // Helper: pindah fokus sesuai arah (+1 maju, -1 mundur)
       const moveFocus = (fromEl, dir = +1) => {
-        const list = getFields(); // ambil ulang untuk kondisi dinamis
+        const list = getFields();
         const i = list.indexOf(fromEl);
         if (i === -1) return;
         let j = i + dir;
-
-        // Cycling: akhir -> awal, awal -> akhir
         if (j >= list.length) j = 0;
         if (j < 0) j = list.length - 1;
 
         const next = list[j];
         next?.focus?.();
-
-        // Untuk input teks/angka/date: auto-select agar cepat overwrite
         if (next && next.tagName === 'INPUT' && next.type !== 'checkbox' && next.type !== 'radio' && next.type !== 'file') {
           next.select?.();
         }
       };
 
-      // Pasang handler sekali per elemen (hindari duplikasi)
       getFields().forEach(el => {
         if (el.dataset.enterNavWired === '1') return;
         el.dataset.enterNavWired = '1';
 
         el.addEventListener('keydown', (e) => {
-          // Jangan ganggu saat masih composing IME (JP)
           if (e.isComposing || e.keyCode === 229) return;
-
           if (e.key === 'Enter') {
-            // Pada textarea, kalau mau multi-line, comment baris ini:
-            e.preventDefault(); // cegah submit / newline
-            const backward = e.shiftKey === true; // Shift+Enter = mundur
+            e.preventDefault(); // cegah submit
+            const backward = e.shiftKey === true;
             moveFocus(el, backward ? -1 : +1);
           }
         });
       });
     }
-    // Mirror tanggal -> span (agar konsisten saat print)
+
     function wireDateMirror(){
       document.querySelectorAll('input[type="date"]').forEach(inp=>{
         const span = document.querySelector(`.print-text[data-from="${inp.name}"]`);
@@ -519,7 +485,6 @@
       });
     }
 
-    // Mirror hanya untuk select 判定 (judge)
     function wireJudgeMirror(){
       document.querySelectorAll('select.judge-select').forEach(sel => {
         if (!sel.nextElementSibling || !sel.nextElementSibling.classList.contains('print-text')) {
@@ -533,7 +498,6 @@
       });
     }
 
-    // Render canvas untuk PDF: tampilkan mirror & sembunyikan elemen no-print
     async function renderFormCanvas() {
       const el = document.querySelector('.b5-preview');
       return html2canvas(el, {
@@ -547,14 +511,12 @@
       });
     }
 
-    // ====== MODIFIKASI: filename menambahkan Customer & 図番 ======
     async function saveAsPDF() {
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'b5' });
       const canvas = await renderFormCanvas();
       doc.addImage(canvas.toDataURL('image/png'), 'PNG', 7, 7, 162, 236);
 
-      // Tanggal untuk prefix
       const makingDate = document.querySelector('input[name="makingdate"]').value;
       const ymd = makingDate
         ? makingDate.replace(/-/g,'')
@@ -563,20 +525,17 @@
             return t.getFullYear()+String(t.getMonth()+1).padStart(2,'0')+String(t.getDate()).padStart(2,'0');
           })();
 
-      // Ambil Customer (td baris 1 kolom 2) dan 図番 (td baris 2 kolom 6)
       const sanitize = s => s.replace(/[\\/:*?"<>|]/g,'').trim();
       const customer = sanitize(document.querySelector('.header-table tr:nth-child(1) td:nth-child(2)')?.textContent || 'no-customer');
       const zuban    = sanitize(document.querySelector('.header-table tr:nth-child(2) td:nth-child(6)')?.textContent || 'no-zuban');
 
-      // Field lain seperti sebelumnya (opsional di filename)
       const inputter = sanitize(document.querySelector('select[name="inputter"]')?.value || 'no-name');
       const orderNo  = sanitize(document.querySelector('input[name="order_no"]')?.value || 'no-order');
       const serialNo = sanitize(document.querySelector('input[name="serial_no"]')?.value || 'no-serial');
 
-      // Simpan PDF dengan format: YYYYMMDD_Customer_図番_Inputter_Order_Serial.pdf
       doc.save(`${ymd}_${customer}_${zuban}_${inputter}_${orderNo}_${serialNo}.pdf`);
     }
-    // Print via PDF r
+
     async function printViaPDF() {
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'b5' });
@@ -590,13 +549,8 @@
     window.addEventListener('load', () => {
       wireJudgeMirror();
       wireDateMirror();
+      wireEnterNavigationAll();
     });
   </script>
 </body>
 </html>
-
-
-
-
-
-
