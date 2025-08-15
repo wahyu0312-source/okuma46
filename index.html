@@ -82,11 +82,14 @@
 
     .td-measure-grid input.invalid { background:#ffebee; box-shadow:inset 0 0 0 1px #d32f2f; }
     @media print { .td-measure-grid input.invalid { background:transparent !important; box-shadow:none !important; } }
-     /* Tengah untuk header + baris pertama data */
-.inspect-table tr:nth-child(-n+1) th,
-.inspect-table tr:nth-child(-n+1) td {
-  text-align: center !important;
-}
+
+    /* Tengah untuk header + baris pertama data */
+    .inspect-table tr:nth-child(-n+1) th,
+    .inspect-table tr:nth-child(-n+1) td { text-align: center !important; }
+
+    /* ===== Serial No prefix UI ===== */
+    .serial-wrap { display:grid; grid-template-columns:auto 1fr; align-items:center; gap:1mm; }
+    .serial-prefix { white-space:nowrap; }
   </style>
 </head>
 <body>
@@ -128,7 +131,14 @@
             <span class="print-text" data-from="makingdate"></span>
           </td>
           <td class="section-label">製造No</td>
-          <td><input type="text" name="serial_no" placeholder="例: Y282520-2245" /></td>
+          <td>
+            <!-- Prefix tetap + input lanjutan; saat cetak tampil sebagai text -->
+            <div class="serial-wrap no-print">
+              <span class="serial-prefix">Y282520-</span>
+              <input type="text" name="serial_no_suffix" inputmode="numeric" placeholder="例: 2245" />
+            </div>
+            <span class="print-text" data-serial-print></span>
+          </td>
         </tr>
         <tr class="order-no-row">
           <td class="section-label">オーダーNo</td>
@@ -255,20 +265,15 @@
       <!-- FINAL JUDGMENT & REMARKS -->
       <div style="margin:2mm 0;">
         <label style="font-weight:bold;">総合判定</label>
-        <select name="final_judgment" class="no-print judge-select" style="margin-left:10mm;">
-          <option>合</option><option>否</option>
+        <select name="final_judgment" class="no-print judge-select" style="margin-left:20mm;">
+          <option>合格</option><option>否</option>
         </select>
         <span class="print-text"></span>
       </div>
       <div style="margin:2mm 0;">
         <label style="font-weight:bold;">[備考]</label>
-        <input type="text" name="bikou" style="width:70%;" />
+        <input type="text" name="bikou" value="2821-20の追加加工" style="width:70%;" />
       </div>
-
-      <!-- Fallback buttons (hidden on screen)
-      <button type="button" class="button no-print" onclick="printViaPDF()">印刷</button>
-      <button type="button" class="button no-print" onclick="saveToNASFixed()">NAS保存</button>
-      <button type="button" class="button no-print" id="clearAllBtn">全クリア</button> -->
 
       <!-- COMPANY & STAMPS -->
       <div class="company-name">東京精密発條株式会社</div>
@@ -310,7 +315,7 @@
       form.reset();
       ['stamp1','stamp2'].forEach(id => document.getElementById(id).src = '');
       form.querySelectorAll('.td-measure-grid input.invalid').forEach(el => el.classList.remove('invalid'));
-      wireJudgeMirror(); wireDateMirror();
+      wireJudgeMirror(); wireDateMirror(); wireEnterNavigationAll(); wireSerialMirror();
     }
     document.getElementById('clearAllBtn')?.addEventListener('click', clearAllFields);
 
@@ -370,6 +375,21 @@
       });
     }
 
+    /* ===== Serial No (prefix tetap + suffix operator) ===== */
+    const getSerialFull = () => {
+      const p = document.querySelector('.serial-prefix')?.textContent || '';
+      const s = (document.querySelector('input[name="serial_no_suffix"]')?.value || '').replace(/[^\d]/g,'').trim();
+      return s ? (p + s) : p;
+    };
+    function wireSerialMirror() {
+      const out = document.querySelector('[data-serial-print]');
+      const inp = document.querySelector('input[name="serial_no_suffix"]');
+      if (!out) return;
+      const upd = () => { out.textContent = getSerialFull(); };
+      inp?.addEventListener('input', upd);
+      upd();
+    }
+
     // ===== Render canvas untuk PDF =====
     async function renderFormCanvas() {
       const el=document.querySelector('.b5-preview');
@@ -388,7 +408,7 @@
       const zuban    = sanitize(document.querySelector('.header-table tr:nth-child(2) td:nth-child(6)')?.textContent || 'no-zuban');
       const inputter = sanitize(document.querySelector('select[name="inputter"]')?.value || 'no-name');
       const orderNo  = sanitize(document.querySelector('input[name="order_no"]')?.value || 'no-order');
-      const serialNo = sanitize(document.querySelector('input[name="serial_no"]')?.value || 'no-serial');
+      const serialNo = sanitize(getSerialFull() || 'no-serial'); // pakai prefix+suffix
       return `${ymd}_${customer}_${zuban}_${inputter}_${orderNo}_${serialNo}.pdf`;
     }
     async function buildPdfDoc(){
@@ -423,7 +443,6 @@
     async function saveToNASFixed(){
       const fileName = computeFilename();
 
-      // Jika browser tidak mendukung → fallback ke Download
       if(!window.showDirectoryPicker){
         const doc = await buildPdfDoc(); doc.save(fileName); return;
       }
@@ -431,20 +450,17 @@
       try{
         let dir = await getHandle(FIXED_KEY);
         if(!dir){
-          // Pertama kali di device ini → pilih folder NAS
           dir = await window.showDirectoryPicker({ mode:'readwrite' });
           await navigator.storage?.persist?.();
           await putHandle(FIXED_KEY, dir);
         }
 
-        // Pastikan izin readwrite
         let perm = await dir.queryPermission?.({ mode:'readwrite' });
         if(perm!=='granted'){
           perm = await dir.requestPermission?.({ mode:'readwrite' });
           if(perm!=='granted'){ const doc = await buildPdfDoc(); doc.save(fileName); return; }
         }
 
-        // Tulis file
         const doc = await buildPdfDoc();
         const fh = await dir.getFileHandle(fileName, { create:true });
         const w = await fh.createWritable();
@@ -458,9 +474,8 @@
 
     // init
     window.addEventListener('load', () => {
-      wireJudgeMirror(); wireDateMirror(); wireEnterNavigationAll();
+      wireJudgeMirror(); wireDateMirror(); wireEnterNavigationAll(); wireSerialMirror();
     });
   </script>
 </body>
 </html>
-
