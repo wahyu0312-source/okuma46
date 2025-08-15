@@ -82,6 +82,11 @@
 
     .td-measure-grid input.invalid { background:#ffebee; box-shadow:inset 0 0 0 1px #d32f2f; }
     @media print { .td-measure-grid input.invalid { background:transparent !important; box-shadow:none !important; } }
+     /* Tengah untuk header + baris pertama data */
+.inspect-table tr:nth-child(-n+1) th,
+.inspect-table tr:nth-child(-n+1) td {
+  text-align: center !important;
+}
   </style>
 </head>
 <body>
@@ -458,3 +463,4 @@
   </script>
 </body>
 </html>
+
