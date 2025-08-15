@@ -375,80 +375,88 @@
     }
     document.getElementById('clearAllBtn')?.addEventListener('click', clearAllFields);
 
-    // ===== Validasi "測定値" =====
-    // - Maks 3 digit sebelum titik.
-    // - Jika step mengandung ".", izinkan 1 digit desimal.
-    // - Cek min/max via data-min / data-max.
-    // - Out-of-range saat blur -> kosongkan & tandai merah.
-    (function wireMeasureValidation() {
-      const fields = document.querySelectorAll('.td-measure-grid input');
+   // ===== Validasi "測定値" (terima . fullwidth/koma & biarkan trailing dot) =====
+(function wireMeasureValidation() {
+  const fields = document.querySelectorAll('.td-measure-grid input');
 
-      fields.forEach(inp => {
-        const allowDecimal = (inp.getAttribute('step') || '').includes('.');
-        const reInt = /^\d{0,3}$/;
-        const reDec = /^\d{0,3}(\.\d{0,1})?$/;
+  // Normalisasi berbagai "titik" & koma ke '.'
+  const normalizeDecimalChars = (s) =>
+    s.replace(/[，,]/g, '.').replace(/[．｡。]/g, '.');
 
-        const getMin = () => parseFloat(inp.dataset.min ?? '-Infinity');
-        const getMax = () => parseFloat(inp.dataset.max ?? 'Infinity');
+  fields.forEach(inp => {
+    const allowDecimal = (inp.getAttribute('step') || '').includes('.');
+    const MAX_INT_DIGITS = 4;  // konsisten 4 digit
 
-        inp.addEventListener('input', () => {
-          let v = inp.value;
+    inp.addEventListener('input', () => {
+      // 1) Normalisasi karakter desimal dari IME/locale
+      let v = normalizeDecimalChars(inp.value);
 
-          // Hanya angka dan titik
-          v = v.replace(/[^\d.]/g, '');
+      // 2) Saring karakter non-digit/non-dot
+      v = v.replace(/[^\d.]/g, '');
 
-          // Hapus titik ganda
-          const firstDot = v.indexOf('.');
-          if (firstDot !== -1) {
-            v = v.slice(0, firstDot + 1) + v.slice(firstDot + 1).replace(/\./g, '');
-          }
+      // 3) Pastikan hanya ada 1 dot: gabungkan sisa bagian sebagai fraksi mentah
+      if ((v.match(/\./g) || []).length > 1) {
+        const [head, ...rest] = v.split('.');
+        v = head + '.' + rest.join('').replace(/\D/g, '');
+      }
 
-          // Batasi 3 digit sebelum titik + 1 desimal jika diizinkan
-          if (v.includes('.')) {
-            const [d, f] = v.split('.');
-            const dTrim = d.slice(0, 3);
-            const fTrim = allowDecimal ? (f ?? '').slice(0, 1) : '';
-            v = fTrim ? `${dTrim}.${fTrim}` : dTrim;
-          } else {
-            v = v.slice(0, 3);
-          }
+      // 4) Pisahkan bagian integer & fraksi
+      if (v.includes('.')) {
+        let [d = '', f = ''] = v.split('.');
+        const dTrim = d.slice(0, MAX_INT_DIGITS);
 
-          // Terapkan regex
-          const ok = allowDecimal ? reDec.test(v) : reInt.test(v);
-          if (!ok) {
-            v = (v.match(/^\d{0,3}/)?.[0]) ?? '';
-          }
+        if (allowDecimal) {
+          // Batasi fraksi 1 digit; biarkan trailing '.' sementara jika belum ada fraksi
+          const fTrim = (f ?? '').replace(/\D/g, '').slice(0, 1);
+          v = f === '' ? `${dTrim}.` : `${dTrim}.${fTrim}`;
+        } else {
+          // Field integer: buang fraksi & titik
+          v = dTrim;
+        }
+      } else {
+        // Tidak ada titik → batasi panjang integer
+        v = v.slice(0, MAX_INT_DIGITS);
+      }
 
-          inp.value = v;
-          inp.classList.remove('invalid'); // hilangkan merah saat sedang diketik
-        });
+      inp.value = v;
+      inp.classList.remove('invalid');
+    });
 
-        inp.addEventListener('blur', () => {
-          const v = inp.value;
-          if (v === '') { inp.classList.remove('invalid'); return; }
+    inp.addEventListener('blur', () => {
+      let v = normalizeDecimalChars(inp.value);
+      if (v === '') { inp.classList.remove('invalid'); return; }
 
-          const n = parseFloat(v);
-          const min = getMin();
-          const max = getMax();
+      // Jika user tinggalkan trailing dot (mis. "7.") → jadikan "7.0"
+      if (allowDecimal && /\.$/.test(v)) v = v.replace(/\.$/, '.0');
 
-          const inRange =
-            !Number.isNaN(n) &&
-            n >= (Number.isFinite(min) ? min : -Infinity) &&
-            n <= (Number.isFinite(max) ? max : Infinity);
+      // Hitung & validasi rentang
+      const n = parseFloat(v);
+      const min = parseFloat(inp.dataset.min ?? '-Infinity');
+      const max = parseFloat(inp.dataset.max ?? 'Infinity');
 
-          if (!inRange) {
-            inp.value = '';             // kosongkan
-            inp.classList.add('invalid'); // tandai merah
-          } else {
-            if (allowDecimal) {
-              // Normalisasi tampilan ke 1 desimal
-              inp.value = n.toFixed(1).replace(/\.0$/, '.0');
-            }
-            inp.classList.remove('invalid');
-          }
-        });
-      });
-    })();
+      const inRange =
+        !Number.isNaN(n) &&
+        n >= (Number.isFinite(min) ? min : -Infinity) &&
+        n <= (Number.isFinite(max) ? max : Infinity);
+
+      if (!inRange) {
+        inp.value = '';
+        inp.classList.add('invalid');
+        return;
+      }
+
+      // Format akhir: bulatkan 1 desimal untuk field desimal
+      if (allowDecimal) {
+        inp.value = n.toFixed(1).replace(/\.0$/, '.0');
+      } else {
+        // pastikan integer murni tanpa titik
+        inp.value = String(Math.trunc(n)).slice(0, 4);
+      }
+      inp.classList.remove('invalid');
+    });
+  });
+})();
+
 // ===== Navigasi Enter di SEMUA field (input, select, textarea) =====
     function wireEnterNavigationAll() {
       const form = document.getElementById('inspection-form');
@@ -586,6 +594,7 @@
   </script>
 </body>
 </html>
+
 
 
 
