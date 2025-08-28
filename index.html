@@ -44,7 +44,6 @@
     @media print { .td-measure-grid input.invalid { background:transparent !important; box-shadow:none !important; } }
     .serial-wrap { display:grid; grid-template-columns:auto 1fr; align-items:center; gap:1mm; }
     .serial-prefix { white-space:nowrap; }
-    /* Soft required highlight */
     .soft-required.pending { background-color:#06e8f8; box-shadow:inset 0 0 0 1px rgba(242,201,76,.25); transition:background-color .25s ease; }
     @media print { .soft-required.pending { background:transparent !important; box-shadow:none !important; } }
   </style>
@@ -58,7 +57,7 @@
     <button type="button" onclick="configureDigits()">#️⃣ 桁数設定</button>
   </div>
 
-  <!-- Overlay jika terkunci oleh perangkat lain -->
+  <!-- overlay lock -->
   <div id="lock-overlay" style="position:fixed;inset:0;background:rgba(255,255,255,.9);display:none;align-items:center;justify-content:center;z-index:9998;text-align:center;padding:20mm;">
     <div style="max-width:120mm;line-height:1.6;font-size:4.5mm;color:#b91c1c;">
       <div style="font-weight:bold;font-size:5mm;margin-bottom:4mm;">このフォームは現在、他の端末で編集中です</div>
@@ -67,11 +66,11 @@
     </div>
   </div>
 
+  <!-- form utama -->
   <form id="inspection-form">
     <div class="b5-preview">
       <h2>出荷検査成績書</h2>
-
-      <table class="header-table">
+       <table class="header-table">
         <tr>
           <td class="section-label">客先</td>
           <td style="width:25%;">オークマ株式会社 御中</td>
@@ -184,7 +183,7 @@
           <div class="signature-box"><img id="stamp2" src="" alt=""></div>
         </div>
       </div>
-    </div>
+      </div>
   </form>
 
   <script>
@@ -377,17 +376,19 @@
         const t=new Date(); alert(`保存しました: ${fileName}\n時刻: ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`);
       }catch(e){ console.error('Gagal tulis NAS; fallback ke Download.', e); const doc = await buildPdfDoc(); doc.save(fileName); }
     }
-
-    function setTodayIfEmpty(inputName){ const inp = document.querySelector(`input[name="${inputName}"]`); if(!inp) return; if(!inp.value){ const t = new Date(); const yyyy=t.getFullYear(); const mm=String(t.getMonth()+1).padStart(2,'0'); const dd=String(t.getDate()).padStart(2,'0'); inp.value = `${yyyy}-${mm}-${dd}`; inp.dispatchEvent(new Event('change', {bubbles:true})); } }
-
-    // ====== 判定 otomatis (fixed 合・合・無・合・合) ======
-    function isOverallPass(){ return true; }
-    function updateOverallJudgment(){ const sel = document.querySelector('select[name="final_judgment"]'); const span = sel.nextElementSibling && sel.nextElementSibling.classList.contains('print-text') ? sel.nextElementSibling : null; sel.value = isOverallPass() ? '合格' : '否'; if (span) span.textContent = sel.value; }
-
-    // ====== KONFIG NEXT NUMBER & DIGITS via UI ======
-    async function configureNextSerial(){ const prefix = serverPrefix(); const input = prompt(`現在のプレフィックス: ${prefix}\n次の製造No（整数）を入力してください`, ''); if(input==null) return; const num = parseInt(String(input).replace(/\D/g,''),10); if(!(num>=1)){ alert('1以上の整数で入力してください'); return; } try{ await setNextSuffixShared(prefix, num); }catch(e){ const KEY = `${SERIAL_SCOPE()}:lastSuffix`; localStorage.setItem(KEY, String(num-1)); } setSerialSuffix(num); alert(`次の製造Noを ${prefix}${formatSuffix(num)} に設定しました`); }
-    async function configureDigits(){ const prefix = serverPrefix(); const input = prompt(`現在のプレフィックス: ${prefix}\n表示桁数（例: 4, 5, 6）。空欄で取消`, String(PAD_DIGITS)); if(input==null || input==='') return; const d = parseInt(String(input).replace(/\D/g,''),10); if(!(d>=1 && d<=12)){ alert('1〜12 の範囲で入力してください'); return; } try{ await setDigitsShared(prefix, d); PAD_DIGITS = d; const cur = (document.querySelector('input[name="serial_no_suffix"]').value||'').replace(/\D/g,''); if(cur){ setSerialSuffix(parseInt(cur,10)); } alert(`表示桁数を ${d} に設定しました`); }catch(e){ PAD_DIGITS = d; const cur = (document.querySelector('input[name="serial_no_suffix"]').value||'').replace(/\D/g,''); if(cur){ setSerialSuffix(parseInt(cur,10)); } }
-
+    function setTodayIfEmpty(inputName){
+      const inp = document.querySelector(`input[name="${inputName}"]`);
+      if(!inp) return;
+      if(!inp.value){
+        const t = new Date();
+        const yyyy = t.getFullYear();
+        const mm   = String(t.getMonth()+1).padStart(2,'0');
+        const dd   = String(t.getDate()).padStart(2,'0');
+        // input type=date harus YYYY-MM-DD
+        inp.value = `${yyyy}-${mm}-${dd}`;
+        // trigger supaya <span class="print-text"> terisi YYYY/MM/DD via wireDateMirror
+        inp.dispatchEvent(new Event('change',{bubbles:true}));
+      }
     }
 
     // ====== INIT ======
