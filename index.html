@@ -228,11 +228,35 @@
     function updateStampPreview(id, src){ document.getElementById(id).src = src || ''; }
     function clearAllFields(){
       const form = document.getElementById('inspection-form');
+
+      // --- Keep 製造No (prefix & suffix) before reset ---
+      const keepPrefix = getSerialPrefix(); // e.g., "2825-"
+      const keepSuffixRaw = (document.querySelector('input[name="serial_no_suffix"]')?.value || '');
+      const keepSuffixNum = parseInt(keepSuffixRaw.replace(/[^\d]/g,''), 10);
+
+      // --- Reset the form ---
       form.reset();
       ['stamp1','stamp2'].forEach(id => document.getElementById(id).src = '');
       form.querySelectorAll('.td-measure-grid input.invalid').forEach(el => el.classList.remove('invalid'));
-      wireDateMirror(); wireEnterNavigationAll(); wireSerialMirror(); wireSoftRequired(); markSoftRequired();
-      setTodayIfEmpty('hakkohiduke'); applyPrefix();
+
+      // --- Re-wire & defaults (do NOT recompute prefix here) ---
+      wireDateMirror();
+      wireEnterNavigationAll();
+      wireSerialMirror();
+      wireSoftRequired();
+      markSoftRequired();
+      setTodayIfEmpty('hakkohiduke');
+
+      // --- Restore 製造No ---
+      const span = document.querySelector('.serial-prefix');
+      if (span && keepPrefix) span.textContent = keepPrefix;
+      if (Number.isFinite(keepSuffixNum)) setSerialSuffix(keepSuffixNum);
+
+      // Update print preview text
+      const out = document.querySelector('[data-serial-print]');
+      if (out) out.textContent = getSerialFull();
+
+      // IMPORTANT: do NOT call applyPrefix() here, so serial prefix stays untouched by reset
     }
 
     /* ===== numeric guards ===== */
@@ -542,5 +566,3 @@
   </script>
 </body>
 </html>
-
-
