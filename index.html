@@ -301,7 +301,7 @@
     function wireDateMirror(){
       document.querySelectorAll('input[type="date"]').forEach(inp=>{
         const span=document.querySelector(`.print-text[data-from="${inp.name}"]`); if(!span) return;
-        const fmt=v=>v?v.replace(/(\d{4})-(\d{2})-(\d{2})/,'$1/$2/$3'):'';
+        const fmt=v=>v?v.replace(/(\d{4})-(\d{2})-(\d{2})/,'$1/$2/$3'):'';  // YYYY/MM/DD
         const upd=()=>span.textContent=fmt(inp.value);
         inp.addEventListener('change',()=>{ upd(); markSoftRequired(); }); upd();
       });
@@ -451,8 +451,9 @@
       const blobUrl = doc.output('bloburl'); window.open(blobUrl, '_blank');
     }
 
-    /* ===== Save to NAS (MB-56V) ===== */
-    const DB_NAME='form-folder-db', STORE='folders'; let __db; const FOLDER_KEY='2835-20MB46V';
+    /* ===== Save to NAS (MB-46V, Y軸) ===== */
+    const DB_NAME='form-folder-db', STORE='folders'; let __db;
+    const FOLDER_KEY = `okuma:${APP_NS}:y`;   // ← Koreksi: alias stabil untuk MB-46V Y軸
     function openDB(){ return new Promise((resolve,reject)=>{ const req=indexedDB.open(DB_NAME,1); req.onupgradeneeded=()=>req.result.createObjectStore(STORE); req.onsuccess=()=>{ __db=req.result; resolve(); }; req.onerror=()=>reject(req.error); });}
     async function openDBIfNeeded(){ if(!__db) await openDB(); }
     async function putHandle(key, handle){ await openDBIfNeeded(); return new Promise((res,rej)=>{ const tx=__db.transaction(STORE,'readwrite'); tx.objectStore(STORE).put(handle,key); tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error); }); }
@@ -566,5 +567,3 @@
   </script>
 </body>
 </html>
-
-
