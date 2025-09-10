@@ -346,8 +346,8 @@
       inp?.addEventListener('input', upd); upd();
     }
     function computePrefixFromZuban(z){
-      const m = String(z||'').match(/^(\d{4})/);
-      return m ? `${m[1]}-` : '';
+      const m = String(z||'').replace(/\D/g,'').match(/^(\d{6})/);
+  return m ? `${m[1]}-` : '';
     }
     function applyPrefix(){
       const z = getZuban();
@@ -567,3 +567,4 @@
   </script>
 </body>
 </html>
+
