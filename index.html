@@ -2,8 +2,9 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>出荷検査成績書 2825-20（MB-46V）</title>
+  <title>出荷検査成績書（MB-46V／Y軸）</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- PDF libs -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <style>
@@ -73,8 +74,10 @@
     .td-measure-grid input.invalid { background:#ffebee; box-shadow:inset 0 0 0 1px #d32f2f; }
     @media print { .td-measure-grid input.invalid { background:transparent !important; box-shadow:none !important; } }
 
-    .serial-wrap { display:grid; grid-template-columns:auto 1fr; align-items:center; gap:1mm; }
+    .serial-wrap { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:1mm; }
     .serial-prefix { white-space:nowrap; }
+    .prefix-refresh { font-size:12px; padding:3px 6px; border:1px solid #ccc; background:#fff; border-radius:6px; cursor:pointer; } /* kecil untuk refresh */
+    .prefix-refresh:hover { filter:brightness(.96); }
 
     .soft-required.pending { background-color:#06e8f8; box-shadow:inset 0 0 0 1px rgba(242,201,76,.25); transition:background-color .25s ease; }
     @media print { .soft-required.pending { background:transparent !important; box-shadow:none !important; } }
@@ -129,8 +132,9 @@
           <td class="section-label">製造No</td>
           <td class="ta-left">
             <div class="serial-wrap no-print">
-              <span class="serial-prefix" data-prefix>2825-</span>
+              <span class="serial-prefix" data-prefix>282520-</span> <!-- default preview -->
               <input type="text" name="serial_no_suffix" inputmode="numeric" placeholder="0001" class="soft-required" data-soft-required="1" readonly />
+              <button type="button" class="prefix-refresh" title="Refresh prefix dari Admin/Z図番" onclick="applyPrefix()">↻ Prefix</button>
             </div>
             <span class="print-text" data-serial-print></span>
           </td>
@@ -149,6 +153,7 @@
           <option value="長谷部">長谷部</option>
           <option value="都合">都合</option>
           <option value="石橋">石橋</option>
+          <option value="ワーユ">ワーユ</option>
         </select>
       </div>
 
@@ -229,34 +234,25 @@
     function clearAllFields(){
       const form = document.getElementById('inspection-form');
 
-      // --- Keep 製造No (prefix & suffix) before reset ---
-      const keepPrefix = getSerialPrefix(); // e.g., "282520-"
+      // Keep 製造No (prefix & suffix) before reset
+      const keepPrefix = getSerialPrefix();
       const keepSuffixRaw = (document.querySelector('input[name="serial_no_suffix"]')?.value || '');
       const keepSuffixNum = parseInt(keepSuffixRaw.replace(/[^\d]/g,''), 10);
 
-      // --- Reset the form ---
       form.reset();
       ['stamp1','stamp2'].forEach(id => document.getElementById(id).src = '');
       form.querySelectorAll('.td-measure-grid input.invalid').forEach(el => el.classList.remove('invalid'));
 
-      // --- Re-wire & defaults (do NOT recompute prefix here) ---
-      wireDateMirror();
-      wireEnterNavigationAll();
-      wireSerialMirror();
-      wireSoftRequired();
-      markSoftRequired();
+      wireDateMirror(); wireEnterNavigationAll(); wireSerialMirror(); wireSoftRequired(); markSoftRequired();
       setTodayIfEmpty('hakkohiduke');
 
-      // --- Restore 製造No ---
       const span = document.querySelector('.serial-prefix');
       if (span && keepPrefix) span.textContent = keepPrefix;
       if (Number.isFinite(keepSuffixNum)) setSerialSuffix(keepSuffixNum);
 
-      // Update print preview text
       const out = document.querySelector('[data-serial-print]');
       if (out) out.textContent = getSerialFull();
-
-      // IMPORTANT: do NOT call applyPrefix() here, so serial prefix stays untouched by reset
+      // Penting: jangan panggil applyPrefix() di sini—biar prefix tidak berganti saat clear
     }
 
     /* ===== numeric guards ===== */
@@ -325,18 +321,64 @@
     }
 
     /* ===== Serial / Prefix ===== */
+
+    // CHANGED: enforce admin override + 6-digit compute + storage listener
+
+    const ACTIVE_PREFIX_KEY = 'kensa_prefix'; // diset dari Admin page
+    function getActivePrefix(){ return (localStorage.getItem(ACTIVE_PREFIX_KEY) || '').trim(); }
+
     const getSerialPrefix = () => document.querySelector('.serial-prefix')?.textContent?.trim() || '';
     const getZuban = () => (document.querySelector('input[name="zuban"]').value || '').trim();
+
+    // CHANGED: 6 digit dari 図番, contoh: "2825-20" => "282520-"
+    function computePrefixFromZuban(z){
+      const m = String(z||'').replace(/\D/g,'').match(/^(\d{6})/);
+      return m ? `${m[1]}-` : '';
+    }
+
+    // CHANGED: prefixReady 6 digit
+    function prefixReady(){ return /^[0-9]{6}-$/.test(getSerialPrefix()); }
+
+    // CHANGED: admin override didahulukan; kalau tidak ada, pakai hasil compute 6 digit
+    function applyPrefix(){
+      const span = document.querySelector('.serial-prefix'); if(!span) return;
+      const adminPref = getActivePrefix();
+      if (adminPref) {
+        // izinkan admin memaksa format lain jika perlu → tapi kita tampilkan warning di console jika bukan 6 digit
+        if(!/^[0-9]{6}-$/.test(adminPref)){
+          console.warn('[Prefix] Admin prefix bukan 6 digit:', adminPref, '(form akan tetap pakai nilai ini)');
+        }
+        span.textContent = adminPref;
+        updateSerialPrint();
+        return;
+      }
+      const pref = computePrefixFromZuban(getZuban());
+      span.textContent = pref;
+      updateSerialPrint();
+    }
+
+    // Listen perubahan dari Admin tab (kenapa form lain bisa, Y軸 tidak → karena kurang ini)
+    window.addEventListener('storage', (e)=>{
+      if(e.key === ACTIVE_PREFIX_KEY){
+        console.log('[Prefix] storage changed by Admin:', e.newValue);
+        applyPrefix(); // akan mengambil kensa_prefix terbaru
+      }
+    });
+
     const getSerialFull = () => {
       const p = getSerialPrefix();
       const s = (document.querySelector('input[name="serial_no_suffix"]').value || '').replace(/[^\d]/g,'').trim();
       return s ? (p + s) : p;
     };
+    function updateSerialPrint(){
+      const out = document.querySelector('[data-serial-print]');
+      if (out) out.textContent = getSerialFull();
+    }
     function formatSuffix(num){ const s = String(num); return s.length >= PAD_DIGITS ? s : ('0'.repeat(PAD_DIGITS - s.length) + s); }
     function setSerialSuffix(num){
       const s = formatSuffix(num);
       const inp = document.querySelector('input[name="serial_no_suffix"]'); if(!inp) return;
-      inp.value = s; inp.dispatchEvent(new Event('input', { bubbles:true })); markSoftRequired();
+      inp.value = s; inp.dispatchEvent(new Event('input', { bubbles:true })); markSoftRequired(); updateSerialPrint();
     }
     function wireSerialMirror(){
       const out = document.querySelector('[data-serial-print]');
@@ -345,17 +387,6 @@
       const upd = () => { out.textContent = getSerialFull(); };
       inp?.addEventListener('input', upd); upd();
     }
-    function computePrefixFromZuban(z){
-      const m = String(z||'').replace(/\D/g,'').match(/^(\d{6})/);
-  return m ? `${m[1]}-` : '';
-    }
-    function applyPrefix(){
-      const z = getZuban();
-      const pref = computePrefixFromZuban(z);
-      const span = document.querySelector('.serial-prefix');
-      if(span) span.textContent = pref;
-    }
-    function prefixReady(){ return /^\d{4}-$/.test(getSerialPrefix()); }
 
     /* ===== GAS API ===== */
     async function apiGAS(body){
@@ -369,7 +400,10 @@
     async function getInfoShared(prefix){ const data = await apiGAS({ action:'getInfo', prefix }); return data; }
 
     async function assignNextSerialSuffix(){
-      if(!prefixReady()){ alert('図番の先頭4桁が必要です（例: 2825）。'); return; }
+      if(!prefixReady()){
+        alert('製造Noのプレフィックス（6桁）が必要です（例: 282520-）。\n図番またはAdmin Prefixを確認してください。');
+        return;
+      }
       const prefix = serverPrefix();
       try{
         const nxt = await getNextSuffixShared(prefix);
@@ -451,9 +485,9 @@
       const blobUrl = doc.output('bloburl'); window.open(blobUrl, '_blank');
     }
 
-    /* ===== Save to NAS (MB-46V, Y軸) ===== */
+    /* ===== Save to NAS (Y軸) ===== */
     const DB_NAME='form-folder-db', STORE='folders'; let __db;
-    const FOLDER_KEY = `okuma:${APP_NS}:y`;   // ← Koreksi: alias stabil untuk MB-46V Y軸
+    const FOLDER_KEY = `okuma:${APP_NS}:y`;   // alias stabil untuk MB-46V Y軸
     function openDB(){ return new Promise((resolve,reject)=>{ const req=indexedDB.open(DB_NAME,1); req.onupgradeneeded=()=>req.result.createObjectStore(STORE); req.onsuccess=()=>{ __db=req.result; resolve(); }; req.onerror=()=>reject(req.error); });}
     async function openDBIfNeeded(){ if(!__db) await openDB(); }
     async function putHandle(key, handle){ await openDBIfNeeded(); return new Promise((res,rej)=>{ const tx=__db.transaction(STORE,'readwrite'); tx.objectStore(STORE).put(handle,key); tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error); }); }
@@ -493,7 +527,7 @@
           perm = await dir.requestPermission?.({ mode:'readwrite' });
           if(perm!=='granted'){ const doc = await buildPdfDoc(); doc.save(fileName); return; }
         }
-        const rawPrefix = getSerialPrefix(); // '2825-'
+        const rawPrefix = getSerialPrefix(); // '282520-'
         const suffixStr = (document.querySelector('input[name="serial_no_suffix"]').value || '').trim();
         const numeric = parseInt(suffixStr.replace(/^0+/,'') || '0', 10);
         const dupe = await serialExists(dir, sanitize(rawPrefix), numeric);
@@ -513,13 +547,19 @@
     /* ===== INIT & Admin ===== */
     window.addEventListener('load', async () => {
       wireDateMirror(); wireEnterNavigationAll(); wireSerialMirror();
-      setTodayIfEmpty('hakkohiduke'); applyPrefix();
+      setTodayIfEmpty('hakkohiduke');
+
+      // CHANGED: applyPrefix awal (ambil dari Admin jika ada), lalu mark
+      applyPrefix();
+
       wireSoftRequired(); markSoftRequired();
-      document.querySelector('input[name="zuban"]').addEventListener('change', applyPrefix);
+      document.querySelector('input[name="zuban"]')?.addEventListener('change', applyPrefix);
+
       try{
         const info = await getInfoShared(serverPrefix());
         if (typeof info?.digits === 'number' && info.digits >= 1) PAD_DIGITS = info.digits;
       }catch(e){}
+
       await ensureHasLockOrAcquire();
     });
     function setTodayIfEmpty(name){
@@ -532,7 +572,7 @@
     window.addEventListener('beforeunload', releaseSharedLock);
 
     async function configureNextSerial(){
-      if(!prefixReady()){ alert('図番の先頭4桁が必要です。'); return; }
+      if(!prefixReady()){ alert('製造Noのプレフィックス（6桁）が必要です。'); return; }
       const prefix = serverPrefix();
       try{
         const info = await getInfoShared(prefix);
@@ -548,7 +588,7 @@
       }catch(e){ alert('設定に失敗しました: ' + (e.message || e)); }
     }
     async function configureDigits(){
-      if(!prefixReady()){ alert('図番の先頭4桁が必要です。'); return; }
+      if(!prefixReady()){ alert('製造Noのプレフィックス（6桁）が必要です。'); return; }
       const prefix = serverPrefix();
       try{
         const info = await getInfoShared(prefix);
@@ -567,5 +607,3 @@
   </script>
 </body>
 </html>
-
-
