@@ -221,7 +221,7 @@
     const APP_NS  = 'mb46v';
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbxWxAa_dWQNoUPhWnkw3P22jgeW4vb44Z5ISuUyUWsAAroFzzE6iIVWMIpqqio6E5OgqA/exec';
     const serverPrefix = () => `${APP_NS}::${getSerialPrefix()}`;
-    const SERIAL_SCOPE = () => `okuma:serial:${APP_NS}:${getSerialPrefix() || '2825-'}`;
+    const SERIAL_SCOPE = () => `okuma:serial:${APP_NS}:${getSerialPrefix() || '282520-'}`;
     let PAD_DIGITS = 4;
 
     /* ===== UI helpers ===== */
@@ -230,7 +230,7 @@
       const form = document.getElementById('inspection-form');
 
       // --- Keep 製造No (prefix & suffix) before reset ---
-      const keepPrefix = getSerialPrefix(); // e.g., "2825-"
+      const keepPrefix = getSerialPrefix(); // e.g., "282520-"
       const keepSuffixRaw = (document.querySelector('input[name="serial_no_suffix"]')?.value || '');
       const keepSuffixNum = parseInt(keepSuffixRaw.replace(/[^\d]/g,''), 10);
 
@@ -567,4 +567,5 @@
   </script>
 </body>
 </html>
+
 
