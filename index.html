@@ -74,10 +74,8 @@
     .td-measure-grid input.invalid { background:#ffebee; box-shadow:inset 0 0 0 1px #d32f2f; }
     @media print { .td-measure-grid input.invalid { background:transparent !important; box-shadow:none !important; } }
 
-    .serial-wrap { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:1mm; }
+    .serial-wrap { display:grid; grid-template-columns:auto 1fr; align-items:center; gap:1mm; }
     .serial-prefix { white-space:nowrap; }
-    .prefix-refresh { font-size:12px; padding:3px 6px; border:1px solid #ccc; background:#fff; border-radius:6px; cursor:pointer; } /* kecil untuk refresh */
-    .prefix-refresh:hover { filter:brightness(.96); }
 
     .soft-required.pending { background-color:#06e8f8; box-shadow:inset 0 0 0 1px rgba(242,201,76,.25); transition:background-color .25s ease; }
     @media print { .soft-required.pending { background:transparent !important; box-shadow:none !important; } }
@@ -132,9 +130,8 @@
           <td class="section-label">製造No</td>
           <td class="ta-left">
             <div class="serial-wrap no-print">
-              <span class="serial-prefix" data-prefix>282520-</span> <!-- default preview -->
+              <span class="serial-prefix" data-prefix>282520-</span>
               <input type="text" name="serial_no_suffix" inputmode="numeric" placeholder="0001" class="soft-required" data-soft-required="1" readonly />
-              <button type="button" class="prefix-refresh" title="Refresh prefix dari Admin/Z図番" onclick="applyPrefix()">↻ Prefix</button>
             </div>
             <span class="print-text" data-serial-print></span>
           </td>
@@ -225,6 +222,7 @@
     /* ===== CONFIG ===== */
     const APP_NS  = 'mb46v';
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbxWxAa_dWQNoUPhWnkw3P22jgeW4vb44Z5ISuUyUWsAAroFzzE6iIVWMIpqqio6E5OgqA/exec';
+    const ACTIVE_PREFIX_KEY = 'kensa_prefix'; // admin override
     const serverPrefix = () => `${APP_NS}::${getSerialPrefix()}`;
     const SERIAL_SCOPE = () => `okuma:serial:${APP_NS}:${getSerialPrefix() || '282520-'}`;
     let PAD_DIGITS = 4;
@@ -250,15 +248,13 @@
       if (span && keepPrefix) span.textContent = keepPrefix;
       if (Number.isFinite(keepSuffixNum)) setSerialSuffix(keepSuffixNum);
 
-      const out = document.querySelector('[data-serial-print]');
-      if (out) out.textContent = getSerialFull();
-      // Penting: jangan panggil applyPrefix() di sini—biar prefix tidak berganti saat clear
+      updateSerialPrint();
     }
 
     /* ===== numeric guards ===== */
     (function wireMeasureValidation(){
       const fields = document.querySelectorAll('.td-measure-grid input');
-      const normalize = s => s.replace(/[，,．｡。]/g,'.');
+      const normalize = s => s.replace(/[，,]/g,'.').replace(/[．｡。]/g,'.');
       fields.forEach(inp=>{
         const allowDec = (inp.getAttribute('step')||'').includes('.');
         const MAX_INT_DIGITS = 6;
@@ -321,49 +317,31 @@
     }
 
     /* ===== Serial / Prefix ===== */
-
-    // CHANGED: enforce admin override + 6-digit compute + storage listener
-
-    const ACTIVE_PREFIX_KEY = 'kensa_prefix'; // diset dari Admin page
     function getActivePrefix(){ return (localStorage.getItem(ACTIVE_PREFIX_KEY) || '').trim(); }
-
     const getSerialPrefix = () => document.querySelector('.serial-prefix')?.textContent?.trim() || '';
     const getZuban = () => (document.querySelector('input[name="zuban"]').value || '').trim();
 
-    // CHANGED: 6 digit dari 図番, contoh: "2825-20" => "282520-"
+    // 6 digit dari 図番 → "282520-"
     function computePrefixFromZuban(z){
       const m = String(z||'').replace(/\D/g,'').match(/^(\d{6})/);
       return m ? `${m[1]}-` : '';
     }
-
-    // CHANGED: prefixReady 6 digit
     function prefixReady(){ return /^[0-9]{6}-$/.test(getSerialPrefix()); }
 
-    // CHANGED: admin override didahulukan; kalau tidak ada, pakai hasil compute 6 digit
     function applyPrefix(){
       const span = document.querySelector('.serial-prefix'); if(!span) return;
       const adminPref = getActivePrefix();
       if (adminPref) {
-        // izinkan admin memaksa format lain jika perlu → tapi kita tampilkan warning di console jika bukan 6 digit
         if(!/^[0-9]{6}-$/.test(adminPref)){
           console.warn('[Prefix] Admin prefix bukan 6 digit:', adminPref, '(form akan tetap pakai nilai ini)');
         }
-        span.textContent = adminPref;
-        updateSerialPrint();
-        return;
+        span.textContent = adminPref; updateSerialPrint(); return;
       }
       const pref = computePrefixFromZuban(getZuban());
-      span.textContent = pref;
-      updateSerialPrint();
+      span.textContent = pref; updateSerialPrint();
     }
 
-    // Listen perubahan dari Admin tab (kenapa form lain bisa, Y軸 tidak → karena kurang ini)
-    window.addEventListener('storage', (e)=>{
-      if(e.key === ACTIVE_PREFIX_KEY){
-        console.log('[Prefix] storage changed by Admin:', e.newValue);
-        applyPrefix(); // akan mengambil kensa_prefix terbaru
-      }
-    });
+    window.addEventListener('storage', (e)=>{ if(e.key === ACTIVE_PREFIX_KEY){ console.log('[Prefix] storage changed by Admin:', e.newValue); applyPrefix(); } });
 
     const getSerialFull = () => {
       const p = getSerialPrefix();
@@ -383,9 +361,7 @@
     function wireSerialMirror(){
       const out = document.querySelector('[data-serial-print]');
       const inp = document.querySelector('input[name="serial_no_suffix"]');
-      if (!out) return;
-      const upd = () => { out.textContent = getSerialFull(); };
-      inp?.addEventListener('input', upd); upd();
+      if (!out) return; const upd = () => { out.textContent = getSerialFull(); }; inp?.addEventListener('input', upd); upd();
     }
 
     /* ===== GAS API ===== */
@@ -487,7 +463,7 @@
 
     /* ===== Save to NAS (Y軸) ===== */
     const DB_NAME='form-folder-db', STORE='folders'; let __db;
-    const FOLDER_KEY = `okuma:${APP_NS}:y`;   // alias stabil untuk MB-46V Y軸
+    const FOLDER_KEY = `okuma:${APP_NS}:y`;
     function openDB(){ return new Promise((resolve,reject)=>{ const req=indexedDB.open(DB_NAME,1); req.onupgradeneeded=()=>req.result.createObjectStore(STORE); req.onsuccess=()=>{ __db=req.result; resolve(); }; req.onerror=()=>reject(req.error); });}
     async function openDBIfNeeded(){ if(!__db) await openDB(); }
     async function putHandle(key, handle){ await openDBIfNeeded(); return new Promise((res,rej)=>{ const tx=__db.transaction(STORE,'readwrite'); tx.objectStore(STORE).put(handle,key); tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error); }); }
@@ -548,18 +524,19 @@
     window.addEventListener('load', async () => {
       wireDateMirror(); wireEnterNavigationAll(); wireSerialMirror();
       setTodayIfEmpty('hakkohiduke');
-
-      // CHANGED: applyPrefix awal (ambil dari Admin jika ada), lalu mark
       applyPrefix();
-
       wireSoftRequired(); markSoftRequired();
-      document.querySelector('input[name="zuban"]')?.addEventListener('change', applyPrefix);
-
+      document.querySelector('input[name="zuban"]')?.addEventListener('change', async ()=>{
+        applyPrefix();
+        try{
+          const info = await getInfoShared(serverPrefix());
+          if (typeof info?.digits === 'number' && info.digits >= 1) PAD_DIGITS = info.digits;
+        }catch(e){}
+      });
       try{
         const info = await getInfoShared(serverPrefix());
         if (typeof info?.digits === 'number' && info.digits >= 1) PAD_DIGITS = info.digits;
       }catch(e){}
-
       await ensureHasLockOrAcquire();
     });
     function setTodayIfEmpty(name){
@@ -599,7 +576,7 @@
         if (!Number.isFinite(n) || n < 1 || n > 8) { alert('1〜8の整数で入力してください'); return; }
         await setDigitsShared(prefix, n);
         PAD_DIGITS = n;
-        const suffix = document.querySelector('input[name="serial_no_suffix"]')?.value || '';
+        const suffix = document.querySelector('input[name="serial_no_suffix"]').value || '';
         if (suffix) setSerialSuffix(parseInt(suffix.replace(/^0+/,'') || '0', 10));
         alert(`桁数を ${n} に設定しました。`);
       }catch(e){ alert('設定に失敗しました: ' + (e.message || e)); }
