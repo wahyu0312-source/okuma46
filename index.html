@@ -231,8 +231,6 @@
     function updateStampPreview(id, src){ document.getElementById(id).src = src || ''; }
     function clearAllFields(){
       const form = document.getElementById('inspection-form');
-
-      // Keep 製造No (prefix & suffix) before reset
       const keepPrefix = getSerialPrefix();
       const keepSuffixRaw = (document.querySelector('input[name="serial_no_suffix"]')?.value || '');
       const keepSuffixNum = parseInt(keepSuffixRaw.replace(/[^\d]/g,''), 10);
@@ -293,7 +291,7 @@
     function wireDateMirror(){
       document.querySelectorAll('input[type="date"]').forEach(inp=>{
         const span=document.querySelector(`.print-text[data-from="${inp.name}"]`); if(!span) return;
-        const fmt=v=>v?v.replace(/(\d{4})-(\d{2})-(\d{2})/,'$1/$2/$3'):'';  // YYYY/MM/DD
+        const fmt=v=>v?v.replace(/(\d{4})-(\d{2})-(\d{2})/,'$1/$2/$3'):'';
         const upd=()=>span.textContent=fmt(inp.value);
         inp.addEventListener('change',()=>{ upd(); markSoftRequired(); }); upd();
       });
@@ -326,22 +324,30 @@
       const m = String(z||'').replace(/\D/g,'').match(/^(\d{6})/);
       return m ? `${m[1]}-` : '';
     }
-    function prefixReady(){ return /^[0-9]{6}-$/.test(getSerialPrefix()); }
+    function prefixReady(){ return /^\d{6}-$/.test(getSerialPrefix()); }
+
+    // BERSIHKAN nilai lama yang salah (mis: "2825-")
+    (function cleanBadAdminPrefix(){
+      const ap = localStorage.getItem(ACTIVE_PREFIX_KEY);
+      if (ap && !/^\d{6}-$/.test(ap)) localStorage.removeItem(ACTIVE_PREFIX_KEY);
+    })();
 
     function applyPrefix(){
       const span = document.querySelector('.serial-prefix'); if(!span) return;
       const adminPref = getActivePrefix();
-      if (adminPref) {
-        if(!/^[0-9]{6}-$/.test(adminPref)){
-          console.warn('[Prefix] Admin prefix bukan 6 digit:', adminPref, '(form akan tetap pakai nilai ini)');
-        }
-        span.textContent = adminPref; updateSerialPrint(); return;
+      const valid = /^\d{6}-$/.test(adminPref);
+
+      if (valid) {
+        span.textContent = adminPref;
+      } else {
+        if (adminPref) localStorage.removeItem(ACTIVE_PREFIX_KEY); // buang nilai salah
+        const pref = computePrefixFromZuban(getZuban());
+        span.textContent = pref;
       }
-      const pref = computePrefixFromZuban(getZuban());
-      span.textContent = pref; updateSerialPrint();
+      updateSerialPrint();
     }
 
-    window.addEventListener('storage', (e)=>{ if(e.key === ACTIVE_PREFIX_KEY){ console.log('[Prefix] storage changed by Admin:', e.newValue); applyPrefix(); } });
+    window.addEventListener('storage', (e)=>{ if(e.key === ACTIVE_PREFIX_KEY){ applyPrefix(); } });
 
     const getSerialFull = () => {
       const p = getSerialPrefix();
@@ -526,6 +532,7 @@
       setTodayIfEmpty('hakkohiduke');
       applyPrefix();
       wireSoftRequired(); markSoftRequired();
+
       document.querySelector('input[name="zuban"]')?.addEventListener('change', async ()=>{
         applyPrefix();
         try{
@@ -533,12 +540,15 @@
           if (typeof info?.digits === 'number' && info.digits >= 1) PAD_DIGITS = info.digits;
         }catch(e){}
       });
+
       try{
         const info = await getInfoShared(serverPrefix());
         if (typeof info?.digits === 'number' && info.digits >= 1) PAD_DIGITS = info.digits;
       }catch(e){}
+
       await ensureHasLockOrAcquire();
     });
+
     function setTodayIfEmpty(name){
       const inp = document.querySelector(`input[name="${name}"]`); if(!inp) return;
       if(!inp.value){
