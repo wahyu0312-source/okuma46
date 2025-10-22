@@ -28,6 +28,9 @@
 
     .header-table td, .header-table th { white-space:nowrap; word-break:keep-all; }
     .header-table input { min-width:0; }
+     .header-table{ table-layout:fixed; width:100%; }
+ .header-table th, .header-table td{ overflow:hidden; }
+
     .ta-left { text-align:left !important; }
 
     .td-measure { padding:0 !important; }
@@ -77,7 +80,11 @@
     .serial-wrap { display:grid; grid-template-columns:auto 1fr; align-items:center; gap:1mm; }
     .serial-prefix { white-space:nowrap; }
 
-    .soft-required.pending { background-color:#06e8f8; box-shadow:inset 0 0 0 1px rgba(242,201,76,.25); transition:background-color .25s ease; }
+   .soft-required.pending {
+   background-color:#fff7cc;
+   box-shadow:inset 0 0 0 1px #e5b200;
+   transition:background-color .25s ease;
+ }
     @media print { .soft-required.pending { background:transparent !important; box-shadow:none !important; } }
   </style>
 </head>
@@ -221,7 +228,7 @@
   <script>
     /* ===== CONFIG ===== */
     const APP_NS  = 'mb46v';
-    const GAS_URL = 'https://script.google.com/macros/s/AKfycbxWxAa_dWQNoUPhWnkw3P22jgeW4vb44Z5ISuUyUWsAAroFzzE6iIVWMIpqqio6E5OgqA/exec';
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbxqFdFhwDowgT0YQL_arewbN31HALqL-MfxnyxdwUbPpx6TzrOzUllGVFmwX85FNEepDg/exec';
     const ACTIVE_PREFIX_KEY = 'kensa_prefix'; // admin override
     const serverPrefix = () => `${APP_NS}::${getSerialPrefix()}`;
     const SERIAL_SCOPE = () => `okuma:serial:${APP_NS}:${getSerialPrefix() || '282520-'}`;
@@ -248,7 +255,34 @@
 
       updateSerialPrint();
     }
+ async function postLog(action, notes=''){
+    const q = s => document.querySelector(s);
+    const serialPrefix = (q('.serial-prefix')?.textContent || '').trim();
+    const serialSuffix = (q('input[name="serial_no_suffix"]')?.value || '').trim();
+    const serialFull   = (typeof getSerialFull === 'function') ? getSerialFull() : (serialPrefix + serialSuffix);
+    const zuban    = (q('input[name="zuban"]')?.value || '').trim();
+    const customer = (document.querySelector('.header-table tr:nth-child(1) td:nth-child(2)')?.textContent || '').trim();
+    const orderNo  = (q('input[name="order_no"]')?.value || '').trim();   // form ini ada
+    const inputter = (q('select[name="inputter"]')?.value || '').trim();
+    const fileName = (typeof computeFilename === 'function') ? computeFilename() : '';
+    const clientId = (localStorage.getItem('okuma:clientId') || '');
 
+    try{
+      await fetch(GAS_URL, {
+        method:'POST',
+        headers:{ 'Content-Type':'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action:'logSave',
+          app_ns: (typeof APP_NS!=='undefined'? APP_NS : ''),
+          serial_prefix: serialPrefix,
+          serial_suffix: serialSuffix,
+          serial_full: serialFull,
+          zuban, customer, order_no: orderNo, inputter,
+          action, file_name: fileName, client_id: clientId, notes
+        })
+      });
+    }catch(e){ console.warn('logSave failed:', e); }
+  }
     /* ===== numeric guards ===== */
     (function wireMeasureValidation(){
       const fields = document.querySelectorAll('.td-measure-grid input');
@@ -424,7 +458,8 @@
       __lockId=null; if(__lockTimer){ clearInterval(__lockTimer); __lockTimer=null; }
     }
     async function ensureHasLockOrAcquire(){
-      const prefix = serverPrefix();
+if (!prefixReady()) { applyPrefix(); if (!prefixReady()) return false; }
+ const prefix = serverPrefix();
       if(__lockId) return true;
       const ok = await acquireSharedLock(prefix);
       if(!ok){ showLockOverlay(true); setEditingEnabled(false); }
@@ -459,12 +494,20 @@
       return doc;
     }
     async function printViaPDF(){
-      const ok = await ensureHasLockOrAcquire();
-      if(!ok){ alert('現在ほかの端末が使用中のため、印刷できません。'); return; }
-      await assignNextSerialSuffix();
-      const doc = await buildPdfDoc();
-      if(doc.autoPrint) doc.autoPrint();
-      const blobUrl = doc.output('bloburl'); window.open(blobUrl, '_blank');
+     if (window.__busy) return;
+  window.__busy = true;
+  try{
+    const ok = await ensureHasLockOrAcquire();
+    if(!ok){ alert('現在ほかの端末が使用中のため、印刷できません。'); return; }
+    await assignNextSerialSuffix();
+    const doc = await buildPdfDoc();
+    if(doc.autoPrint) doc.autoPrint();
+    const blobUrl = doc.output('bloburl');
+    window.open(blobUrl, '_blank');
+    postLog('PRINT');
+  } finally {
+    window.__busy = false;
+  }
     }
 
     /* ===== Save to NAS (Y軸) ===== */
@@ -496,34 +539,55 @@
       return dir || null;
     }
     async function saveToNASFixed(){
-      const ok = await ensureHasLockOrAcquire();
-      if(!ok){ alert('現在ほかの端末が使用中のため、保存できません。'); return; }
-      await assignNextSerialSuffix();
-      const fileName = computeFilename();
-      if(!window.showDirectoryPicker){ const doc = await buildPdfDoc(); doc.save(fileName); return; }
-      try{
-        let dir = await ensureDir();
-        if(!dir){ const doc = await buildPdfDoc(); doc.save(fileName); return; }
-        let perm = await dir.queryPermission?.({ mode:'readwrite' });
-        if(perm!=='granted'){
-          perm = await dir.requestPermission?.({ mode:'readwrite' });
-          if(perm!=='granted'){ const doc = await buildPdfDoc(); doc.save(fileName); return; }
-        }
-        const rawPrefix = getSerialPrefix(); // '282520-'
-        const suffixStr = (document.querySelector('input[name="serial_no_suffix"]').value || '').trim();
-        const numeric = parseInt(suffixStr.replace(/^0+/,'') || '0', 10);
-        const dupe = await serialExists(dir, sanitize(rawPrefix), numeric);
-        if(dupe){ alert(`同じ製造Noのファイルが既に存在します:\n${dupe}\n保存を中止しました。`); return; }
-        const doc = await buildPdfDoc();
-        const fh = await dir.getFileHandle(fileName, { create:true });
-        const w = await fh.createWritable();
-        await w.write(doc.output('blob')); await w.close();
-        const t=new Date();
-        alert(`保存しました: ${fileName}\n時刻: ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`);
-      }catch(e){
-        console.error('NAS write failed; fallback to download.', e);
+     if (window.__busy) return;
+  window.__busy = true;
+  try{
+    const ok = await ensureHasLockOrAcquire();
+    if(!ok){ alert('現在ほかの端末が使用中のため、保存できません。'); return; }
+    await assignNextSerialSuffix();
+    const fileName = computeFilename();
+    // Fallback: browser tanpa File System Access API
+    if(!window.showDirectoryPicker){
+      const doc = await buildPdfDoc(); doc.save(fileName);
+      postLog('SAVE','fallback-download');
+      return;
+    }
+    try{
+      let dir = await ensureDir();
+      if(!dir){
         const doc = await buildPdfDoc(); doc.save(fileName);
+        postLog('SAVE','fallback-download-no-dir');
+        return;
       }
+      let perm = await dir.queryPermission?.({ mode:'readwrite' });
+      if(perm!=='granted'){
+        perm = await dir.requestPermission?.({ mode:'readwrite' });
+        if(perm!=='granted'){
+          const doc = await buildPdfDoc(); doc.save(fileName);
+          postLog('SAVE','fallback-download-no-permission');
+          return;
+        }
+      }
+      const rawPrefix = getSerialPrefix(); // '282520-'
+      const suffixStr = (document.querySelector('input[name="serial_no_suffix"]').value || '').trim();
+      const numeric = parseInt(suffixStr.replace(/^0+/,'') || '0', 10);
+      const dupe = await serialExists(dir, sanitize(rawPrefix), numeric);
+      if(dupe){ alert(`同じ製造Noのファイルが既に存在します:\n${dupe}\n保存を中止しました。`); return; }
+      const doc = await buildPdfDoc();
+      const fh = await dir.getFileHandle(fileName, { create:true });
+      const w = await fh.createWritable();
+      await w.write(doc.output('blob')); await w.close();
+      const t=new Date();
+      alert(`保存しました: ${fileName}\n時刻: ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`);
+      postLog('SAVE');
+   }catch(e){
+      console.error('NAS write failed; fallback to download.', e);
+      const doc = await buildPdfDoc(); doc.save(fileName);
+      postLog('SAVE','fallback-download-error');
+    }
+  } finally {
+    window.__busy = false;
+  }
     }
 
     /* ===== INIT & Admin ===== */
@@ -594,4 +658,5 @@
   </script>
 </body>
 </html>
+
 
