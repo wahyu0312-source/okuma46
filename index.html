@@ -228,7 +228,7 @@
   <script>
     /* ===== CONFIG ===== */
     const APP_NS  = 'mb46v';
-    const GAS_URL = 'https://script.google.com/macros/s/AKfycbxqFdFhwDowgT0YQL_arewbN31HALqL-MfxnyxdwUbPpx6TzrOzUllGVFmwX85FNEepDg/exec';
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbzVgHHvdizqFzkejzMsCwrAmGtFvmkoUPJwQT_rtWi3Twsg6xoaGpT0IkvUIbe82Q90hA/exec';
     const ACTIVE_PREFIX_KEY = 'kensa_prefix'; // admin override
     const serverPrefix = () => `${APP_NS}::${getSerialPrefix()}`;
     const SERIAL_SCOPE = () => `okuma:serial:${APP_NS}:${getSerialPrefix() || '282520-'}`;
@@ -658,5 +658,6 @@ if (!prefixReady()) { applyPrefix(); if (!prefixReady()) return false; }
   </script>
 </body>
 </html>
+
 
 
