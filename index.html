@@ -28,10 +28,8 @@
 
     .header-table td, .header-table th { white-space:nowrap; word-break:keep-all; }
     .header-table input { min-width:0; }
-     .header-table{ table-layout:fixed; width:100%; }
- .header-table th, .header-table td{ overflow:hidden; }
-
     .ta-left { text-align:left !important; }
+
 
     .td-measure { padding:0 !important; }
     .td-measure-grid { display:grid; grid-template-columns:1fr auto; align-items:center; gap:1mm; }
@@ -86,36 +84,6 @@
    transition:background-color .25s ease;
  }
     @media print { .soft-required.pending { background:transparent !important; box-shadow:none !important; } }
-    /* ==== FIX teks kepotong di header & input ==== */
-.header-table { table-layout: fixed; width: 100%; }
-.header-table th, .header-table td {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  padding: 1.4mm 1mm;            /* sedikit lebih lega */
-}
-
-/* Override rule lama yang pakai height:100% */
-table input,
-table input[type="date"],
-.td-measure-grid input {
-  height: auto;                  /* <-- kunci utamanya */
-  line-height: 1.2;
-  padding: .4mm .9mm;
-  display: block;
-  min-width: 0;                  /* biar bisa mengecil di cell sempit */
-}
-
-/* Nomor seri jangan pecah baris */
-.serial-wrap { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 1mm; }
-.serial-prefix { white-space: nowrap; }
-
-/* Cetak tetap rapi */
-@media print {
-  .header-table th, .header-table td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  table input, table input[type="date"], .td-measure-grid input { height: auto !important; }
-}
-
   </style>
  </head>
 <body>
@@ -140,7 +108,7 @@ table input[type="date"],
       <h2>出荷検査成績書</h2>
 
       <table class="header-table">
-                <tr>
+        <tr>
          <td class="section-label">客先</td><td>オークマ株式会社 御中</td>
           <td class="section-label">管理No.</td><td class="ta-left">TTS60-01-686</td>
           <td class="section-label">発行年月日</td>
