@@ -86,28 +86,35 @@
    transition:background-color .25s ease;
  }
     @media print { .soft-required.pending { background:transparent !important; box-shadow:none !important; } }
-    /* ==== FIX untuk header-table ==== */
-.header-table { table-layout: auto; }               /* aman walau sebelumnya tidak di-set */
-.header-table th { white-space: nowrap; }           /* header tetap satu baris */
-.header-table td {
-  white-space: normal;                              /* override nowrap */
-  word-break: break-word;                           /* override keep-all */
-  overflow: visible;
+    /* ==== FIX teks kepotong di header & input ==== */
+.header-table { table-layout: fixed; width: 100%; }
+.header-table th, .header-table td {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 1.4mm 1mm;            /* sedikit lebih lega */
 }
 
-/* Jangan paksa input setinggi sel */
+/* Override rule lama yang pakai height:100% */
 table input,
 table input[type="date"],
 .td-measure-grid input {
-  height: auto;           /* override 100% */
-  padding: .8mm 1mm;
+  height: auto;                  /* <-- kunci utamanya */
+  line-height: 1.2;
+  padding: .4mm .9mm;
+  display: block;
+  min-width: 0;                  /* biar bisa mengecil di cell sempit */
 }
 
-.header-table input { min-width:0; min-height:5mm; line-height:1.25; }
-.header-table .ta-left { white-space: normal; word-break: break-word; }
+/* Nomor seri jangan pecah baris */
+.serial-wrap { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 1mm; }
+.serial-prefix { white-space: nowrap; }
 
-/* opsional: beri lebar ke sel yang panjang */
-.header-table .wide-cell { width: 38mm; }
+/* Cetak tetap rapi */
+@media print {
+  .header-table th, .header-table td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  table input, table input[type="date"], .td-measure-grid input { height: auto !important; }
+}
 
   </style>
  </head>
@@ -133,9 +140,8 @@ table input[type="date"],
       <h2>出荷検査成績書</h2>
 
       <table class="header-table">
-        <tr>
-         <td class="section-label">客先</td>
-<td class="ta-left wide-cell">オークマ株式会社 御中</td>
+                <tr>
+         <td class="section-label">客先</td><td>オークマ株式会社 御中</td>
           <td class="section-label">管理No.</td><td class="ta-left">TTS60-01-686</td>
           <td class="section-label">発行年月日</td>
           <td class="ta-left">
@@ -146,8 +152,7 @@ table input[type="date"],
 
         <tr>
           <td class="section-label">機種</td><td class="ta-left">MB-46V</td>
-         <td class="section-label">品番</td>
-<td class="ta-left wide-cell">H1090-0021-02-5</td>
+          <td class="section-label">品番</td><td>H1090-0021-02-5</td>
 
           <td class="section-label">図番</td>
           <td><input type="text" name="zuban" value="2825-20" class="soft-required" data-soft-required="1" /></td>
