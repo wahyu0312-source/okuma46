@@ -87,6 +87,31 @@
  }
     @media print { .soft-required.pending { background:transparent !important; box-shadow:none !important; } }
   </style>
+  <!-- ... CSS lama Anda ... -->
+
+<style>
+  /* ==== FIX: header-table text/input clipping ==== */
+  .header-table { table-layout: auto; }                 /* kolom fleksibel */
+  .header-table th { white-space: nowrap; }             /* label tetap 1 baris */
+  .header-table td {
+    white-space: normal;                                /* konten boleh bungkus */
+    word-break: break-word;
+    overflow: visible;
+  }
+
+  .header-table input { min-height: 5mm; line-height: 1.25; }
+  table input, table input[type="date"], .td-measure-grid input {
+    height: auto;                                       /* jangan 100% */
+    padding: .8mm 1mm;                                  /* ruang vertikal cukup */
+  }
+
+  /* opsional: semua sel text kiri boleh wrap */
+  .header-table .ta-left { white-space: normal; word-break: break-word; }
+
+  /* opsional: beri lebar khusus sel yang sering panjang */
+  .header-table .wide-cell { width: 38mm; }             /* ubah angka bila perlu */
+</style>
+
 </head>
 <body>
   <div class="toolbar">
@@ -111,7 +136,9 @@
 
       <table class="header-table">
         <tr>
-          <td class="section-label">客先</td><td>オークマ株式会社 御中</td>
+          <td class="section-label">客先</td>
+<td class="ta-left wide-cell">オークマ株式会社 御中</td>
+
           <td class="section-label">管理No.</td><td class="ta-left">TTS60-01-686</td>
           <td class="section-label">発行年月日</td>
           <td class="ta-left">
@@ -122,7 +149,9 @@
 
         <tr>
           <td class="section-label">機種</td><td class="ta-left">MB-46V</td>
-          <td class="section-label">品番</td><td>H1090-0021-02-5</td>
+         <td class="section-label">品番</td>
+<td class="ta-left wide-cell">H1090-0021-02-5</td>
+
           <td class="section-label">図番</td>
           <td><input type="text" name="zuban" value="2825-20" class="soft-required" data-soft-required="1" /></td>
         </tr>
@@ -658,6 +687,7 @@ if (!prefixReady()) { applyPrefix(); if (!prefixReady()) return false; }
   </script>
 </body>
 </html>
+
 
 
 
