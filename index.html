@@ -86,33 +86,31 @@
    transition:background-color .25s ease;
  }
     @media print { .soft-required.pending { background:transparent !important; box-shadow:none !important; } }
+    /* ==== FIX untuk header-table ==== */
+.header-table { table-layout: auto; }               /* aman walau sebelumnya tidak di-set */
+.header-table th { white-space: nowrap; }           /* header tetap satu baris */
+.header-table td {
+  white-space: normal;                              /* override nowrap */
+  word-break: break-word;                           /* override keep-all */
+  overflow: visible;
+}
+
+/* Jangan paksa input setinggi sel */
+table input,
+table input[type="date"],
+.td-measure-grid input {
+  height: auto;           /* override 100% */
+  padding: .8mm 1mm;
+}
+
+.header-table input { min-width:0; min-height:5mm; line-height:1.25; }
+.header-table .ta-left { white-space: normal; word-break: break-word; }
+
+/* opsional: beri lebar ke sel yang panjang */
+.header-table .wide-cell { width: 38mm; }
+
   </style>
-  <!-- ... CSS lama Anda ... -->
-
-<style>
-  /* ==== FIX: header-table text/input clipping ==== */
-  .header-table { table-layout: auto; }                 /* kolom fleksibel */
-  .header-table th { white-space: nowrap; }             /* label tetap 1 baris */
-  .header-table td {
-    white-space: normal;                                /* konten boleh bungkus */
-    word-break: break-word;
-    overflow: visible;
-  }
-
-  .header-table input { min-height: 5mm; line-height: 1.25; }
-  table input, table input[type="date"], .td-measure-grid input {
-    height: auto;                                       /* jangan 100% */
-    padding: .8mm 1mm;                                  /* ruang vertikal cukup */
-  }
-
-  /* opsional: semua sel text kiri boleh wrap */
-  .header-table .ta-left { white-space: normal; word-break: break-word; }
-
-  /* opsional: beri lebar khusus sel yang sering panjang */
-  .header-table .wide-cell { width: 38mm; }             /* ubah angka bila perlu */
-</style>
-
-</head>
+ </head>
 <body>
   <div class="toolbar">
     <button type="button" onclick="printViaPDF()">🖨️ 印刷</button>
@@ -136,9 +134,8 @@
 
       <table class="header-table">
         <tr>
-          <td class="section-label">客先</td>
+         <td class="section-label">客先</td>
 <td class="ta-left wide-cell">オークマ株式会社 御中</td>
-
           <td class="section-label">管理No.</td><td class="ta-left">TTS60-01-686</td>
           <td class="section-label">発行年月日</td>
           <td class="ta-left">
@@ -687,6 +684,7 @@ if (!prefixReady()) { applyPrefix(); if (!prefixReady()) return false; }
   </script>
 </body>
 </html>
+
 
 
 
